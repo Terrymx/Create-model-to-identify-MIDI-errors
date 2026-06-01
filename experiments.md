@@ -154,3 +154,50 @@ E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -u -m midi
   --num-workers 0 `
   --output checkpoints\transformer_precision_finetune.pt
 ```
+
+## Result: Precision-First Low-Error Fine-Tune
+
+Checkpoint: `checkpoints\transformer_precision_finetune.pt`.
+
+Status: completed 30 corrupt-stage epochs. Best checkpoint saved at epoch 28 by `precision_task_score`.
+
+Key configuration:
+
+- initialized from `checkpoints\transformer_chord_degree_taskscore.pt`
+- train error rates cycled through `0.005`, `0.01`, `0.02`, `0.05`
+- eval error rate `0.01`, observed `0.0115`
+- default detection threshold `0.95`
+- threshold sweep `0.8 0.85 0.9 0.95 0.97 0.98 0.99`
+- `det_pos_weight=1.0`
+- saved by `precision_task_score`
+
+Best checkpoint metrics:
+
+| Metric | Value |
+| --- | ---: |
+| `epoch` | `28` |
+| `precision_task_score` | `0.8106` |
+| `task_score` | `0.7800` |
+| `best_det_f0_5` | `0.7613` |
+| `best_det_f0_5_precision` | `0.8753` |
+| `best_det_f0_5_recall` | `0.5006` |
+| `best_det_f0_5_threshold` | `0.97` |
+| `best_det_f1` | `0.6852` |
+| `best_det_precision` | `0.7338` |
+| `best_det_recall` | `0.6426` |
+| `best_det_threshold` | `0.85` |
+| `det_precision` at threshold `0.95` | `0.8410` |
+| `det_recall` at threshold `0.95` | `0.5452` |
+| `det_f1` at threshold `0.95` | `0.6616` |
+| `det_f0_5` at threshold `0.95` | `0.7587` |
+| `replace_pitch_top3` | `0.9130` |
+| `replace_kind_acc` | `0.8367` |
+| `delete_kind_acc` | `0.9667` |
+
+Interpretation:
+
+- The precision-first fine-tune improved sparse-error precision substantially versus the low-error eval baseline.
+- At observed error rate `0.0115`, the previous checkpoint reached precision `0.5335` at threshold `0.95`; this run reaches `0.8753` with the F0.5-selected threshold `0.97`.
+- Overall task score also improved slightly over the prior Transformer baseline: `0.7800` vs `0.7743`.
+- Recall drops as intended, but remains usable enough for a precision-first workflow where false positives are costly.
+- Next useful step is post-processing: high-confidence reporting, per-piece candidate limits, and optional top-K / local peak filtering before expanding datasets.
