@@ -5,3 +5,6 @@ __pycache__/
 venv/
 build/
 dist/
+training_logs/*.log
+training_logs/*.err.log
+checkpoints/smoke_*.pt

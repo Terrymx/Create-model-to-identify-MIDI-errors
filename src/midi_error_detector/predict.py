@@ -9,7 +9,7 @@ import sys
 import torch
 
 from .data import extract_note_events, note_features
-from .model import BiGRUWrongNoteModel
+from .model import build_wrong_note_model
 
 ACTION_NAMES = ["keep", "replace", "delete"]
 
@@ -39,11 +39,21 @@ def main() -> None:
         threshold = float(valid_metrics.get("best_det_threshold", train_args.get("det_threshold", 0.3)))
         print(f"using detection threshold={threshold} from checkpoint/default", file=sys.stderr)
     state_dict = checkpoint["model_state_dict"]
-    input_size = int(train_args.get("input_size", state_dict["encoder.weight_ih_l0"].shape[1]))
-    model = BiGRUWrongNoteModel(
+    if "input_size" in train_args:
+        input_size = int(train_args["input_size"])
+    elif "encoder.weight_ih_l0" in state_dict:
+        input_size = int(state_dict["encoder.weight_ih_l0"].shape[1])
+    else:
+        input_size = int(state_dict["input_projection.weight"].shape[1])
+    model = build_wrong_note_model(
+        model_type=str(train_args.get("model", "bigru")),
         input_size=input_size,
         hidden_size=int(train_args.get("hidden_size", 256)),
         num_layers=int(train_args.get("num_layers", 2)),
+        transformer_d_model=int(train_args.get("transformer_d_model", 192)),
+        transformer_heads=int(train_args.get("transformer_heads", 4)),
+        transformer_ffn_dim=int(train_args.get("transformer_ffn_dim", 512)),
+        dropout=float(train_args.get("dropout", 0.2)),
     ).to(device)
     model.load_state_dict(state_dict)
     model.eval()

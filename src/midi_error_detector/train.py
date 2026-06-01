@@ -10,7 +10,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .data import FEATURE_SIZE, MaestroWrongNoteDataset
-from .model import BiGRUWrongNoteModel, masked_bce_with_logits, masked_kind_loss, masked_pitch_loss
+from .model import build_wrong_note_model, masked_bce_with_logits, masked_kind_loss, masked_pitch_loss
+
+
+def f_beta(precision: float, recall: float, beta: float) -> float:
+    beta_squared = beta * beta
+    return (1.0 + beta_squared) * precision * recall / max(beta_squared * precision + recall, 1e-12)
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-root", required=True, help="Extracted MAESTRO MIDI archive directory")
     parser.add_argument("--version", default="v3.0.0", help="MAESTRO version, e.g. v3.0.0")
     parser.add_argument("--output", default="checkpoints/bigru_wrong_note.pt")
+    parser.add_argument("--init-checkpoint", default=None, help="Optional checkpoint to initialize/fine-tune from.")
     parser.add_argument("--eval-split", default="test", choices=["validation", "test"], help="Held-out split used for metrics")
     parser.add_argument("--epochs", type=int, default=20, help="Corrupted-data fine-tuning epochs")
     parser.add_argument(
@@ -35,6 +41,13 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.15,
         help="Corrupted training-stage error rate; higher than eval by default to improve recall.",
+    )
+    parser.add_argument(
+        "--train-error-rates",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Optional per-epoch cycle of training corruption rates, useful for sparse-error fine-tuning.",
     )
     parser.add_argument(
         "--det-threshold",
@@ -55,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--hidden-size", type=int, default=256)
     parser.add_argument("--num-layers", type=int, default=2)
+    parser.add_argument("--model", choices=["bigru", "transformer"], default="bigru")
+    parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--transformer-d-model", type=int, default=192)
+    parser.add_argument("--transformer-heads", type=int, default=4)
+    parser.add_argument("--transformer-ffn-dim", type=int, default=512)
     parser.add_argument("--pitch-loss-weight", type=float, default=0.5)
     parser.add_argument("--kind-loss-weight", type=float, default=0.3)
     parser.add_argument(
@@ -81,7 +99,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--save-metric",
         default="task_score",
-        choices=["task_score", "det_f1", "best_det_f1", "replace_pitch_top3", "loss"],
+        choices=[
+            "task_score",
+            "precision_task_score",
+            "det_f1",
+            "det_f0_5",
+            "best_det_f1",
+            "best_det_f0_5",
+            "replace_pitch_top3",
+            "loss",
+        ],
         help="Metric used to select the best checkpoint; task_score combines detection/action/top3 quality.",
     )
     parser.add_argument("--max-files", type=int, default=None, help="Debug on the first N files of each split")
@@ -235,23 +262,35 @@ def run_epoch(
     precision = totals["tp"] / precision_denominator
     recall = totals["tp"] / recall_denominator
     f1 = 2.0 * precision * recall / max(precision + recall, 1e-12)
+    f0_5 = f_beta(precision, recall, beta=0.5)
     best_threshold = det_threshold
     best_threshold_precision = precision
     best_threshold_recall = recall
     best_threshold_f1 = f1
+    best_f0_5_threshold = det_threshold
+    best_f0_5_precision = precision
+    best_f0_5_recall = recall
+    best_threshold_f0_5 = f0_5
     for threshold, stats in threshold_stats.items():
         threshold_precision = stats["tp"] / max(stats["tp"] + stats["fp"], 1.0)
         threshold_recall = stats["tp"] / max(stats["tp"] + stats["fn"], 1.0)
         threshold_f1 = 2.0 * threshold_precision * threshold_recall / max(threshold_precision + threshold_recall, 1e-12)
+        threshold_f0_5 = f_beta(threshold_precision, threshold_recall, beta=0.5)
         if threshold_f1 > best_threshold_f1:
             best_threshold = threshold
             best_threshold_precision = threshold_precision
             best_threshold_recall = threshold_recall
             best_threshold_f1 = threshold_f1
+        if threshold_f0_5 > best_threshold_f0_5:
+            best_f0_5_threshold = threshold
+            best_f0_5_precision = threshold_precision
+            best_f0_5_recall = threshold_recall
+            best_threshold_f0_5 = threshold_f0_5
 
     replace_kind_acc = totals["replace_kind_correct"] / replace_notes
     replace_pitch_top3 = totals["replace_pitch_top3"] / replace_notes
     task_score = 0.50 * best_threshold_f1 + 0.25 * replace_pitch_top3 + 0.25 * replace_kind_acc
+    precision_task_score = 0.60 * best_threshold_f0_5 + 0.25 * replace_pitch_top3 + 0.15 * replace_kind_acc
     return {
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
@@ -267,11 +306,17 @@ def run_epoch(
         "det_precision": precision,
         "det_recall": recall,
         "det_f1": f1,
+        "det_f0_5": f0_5,
         "best_det_threshold": best_threshold,
         "best_det_precision": best_threshold_precision,
         "best_det_recall": best_threshold_recall,
         "best_det_f1": best_threshold_f1,
+        "best_det_f0_5_threshold": best_f0_5_threshold,
+        "best_det_f0_5_precision": best_f0_5_precision,
+        "best_det_f0_5_recall": best_f0_5_recall,
+        "best_det_f0_5": best_threshold_f0_5,
         "task_score": task_score,
+        "precision_task_score": precision_task_score,
         "error_rate": totals["error_notes"] / notes,
         "replace_rate": totals["replace_notes"] / notes,
         "delete_rate": totals["delete_notes"] / notes,
@@ -289,8 +334,26 @@ def main() -> None:
     # application is finding and correcting errors rather than scoring clean MIDI.
     test_loader = make_loader(args, args.eval_split, shuffle=False, error_rate=args.error_rate)
 
-    model = BiGRUWrongNoteModel(input_size=FEATURE_SIZE, hidden_size=args.hidden_size, num_layers=args.num_layers).to(device)
+    model = build_wrong_note_model(
+        model_type=args.model,
+        input_size=FEATURE_SIZE,
+        hidden_size=args.hidden_size,
+        num_layers=args.num_layers,
+        transformer_d_model=args.transformer_d_model,
+        transformer_heads=args.transformer_heads,
+        transformer_ffn_dim=args.transformer_ffn_dim,
+        dropout=args.dropout,
+    ).to(device)
+    if args.init_checkpoint:
+        checkpoint = torch.load(args.init_checkpoint, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        print(
+            f"loaded init checkpoint={args.init_checkpoint} "
+            f"stage={checkpoint.get('stage')} epoch={checkpoint.get('epoch')}",
+            flush=True,
+        )
     args.input_size = FEATURE_SIZE
+    print(f"model={args.model} parameters={sum(param.numel() for param in model.parameters()):,}", flush=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scheduler_mode = "min" if args.save_metric == "loss" else "max"
     scheduler = None
@@ -351,14 +414,18 @@ def main() -> None:
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
 
-    train_loader.dataset.error_rate = args.train_error_rate
+    train_error_rates = args.train_error_rates or [args.train_error_rate]
+    train_loader.dataset.error_rate = train_error_rates[0]
     print(
-        f"switching train loader to corrupted stage: train_error_rate={args.train_error_rate}, "
+        f"switching train loader to corrupted stage: train_error_rates={train_error_rates}, "
         f"eval_error_rate={args.error_rate}, det_threshold={args.det_threshold}",
         flush=True,
     )
     epochs_without_improvement = 0
     for epoch in range(1, args.epochs + 1):
+        train_error_rate = train_error_rates[(epoch - 1) % len(train_error_rates)]
+        train_loader.dataset.error_rate = train_error_rate
+        print(f"corrupt epoch={epoch}/{args.epochs} train_error_rate={train_error_rate}", flush=True)
         train_loader.dataset.set_epoch(args.clean_epochs + epoch)
         train_metrics = run_epoch(
             model,

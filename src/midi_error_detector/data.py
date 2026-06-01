@@ -22,12 +22,19 @@ from tqdm import tqdm
 
 ErrorKind = Literal["clean", "neighbor", "nearby", "nearby_plus_touch", "delete_touch"]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
-FEATURE_SIZE = 16
+FEATURE_SIZE = 24
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}
 _MINOR_SCALE_PCS = {0, 2, 3, 5, 7, 8, 10}
 _CONSONANT_INTERVAL_CLASSES = {0, 3, 4, 5, 7, 8, 9}
+_MAJOR_DEGREES = {0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6}
+_MINOR_DEGREES = {0: 0, 2: 1, 3: 2, 5: 3, 7: 4, 8: 5, 10: 6}
+_TRIAD_INTERVALS = {
+    "major": {0, 4, 7},
+    "minor": {0, 3, 7},
+    "diminished": {0, 3, 6},
+}
 
 
 @dataclass(frozen=True)
@@ -201,6 +208,64 @@ def _harmonic_context_features(
     return density, nearest_interval, consonance
 
 
+def _nearest_scale_distance(relative_pc: int, scale_pcs: set[int]) -> float:
+    distances = [min((relative_pc - pc) % 12, (pc - relative_pc) % 12) for pc in scale_pcs]
+    return min(distances) / 6.0
+
+
+def _scale_degree_features(
+    major_relative_pc: np.ndarray,
+    minor_relative_pc: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    note_count = len(major_relative_pc)
+    major_degree = np.full(note_count, -1.0, dtype=np.float32)
+    minor_degree = np.full(note_count, -1.0, dtype=np.float32)
+    major_scale_distance = np.zeros(note_count, dtype=np.float32)
+    minor_scale_distance = np.zeros(note_count, dtype=np.float32)
+    for idx, (major_pc, minor_pc) in enumerate(zip(major_relative_pc.tolist(), minor_relative_pc.tolist())):
+        if major_pc in _MAJOR_DEGREES:
+            major_degree[idx] = _MAJOR_DEGREES[major_pc] / 6.0
+        if minor_pc in _MINOR_DEGREES:
+            minor_degree[idx] = _MINOR_DEGREES[minor_pc] / 6.0
+        major_scale_distance[idx] = _nearest_scale_distance(int(major_pc), _MAJOR_SCALE_PCS)
+        minor_scale_distance[idx] = _nearest_scale_distance(int(minor_pc), _MINOR_SCALE_PCS)
+    return major_degree, minor_degree, major_scale_distance, minor_scale_distance
+
+
+def _local_chord_features(
+    starts: np.ndarray,
+    pitches: np.ndarray,
+    onset_tolerance: float = 0.08,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    note_count = len(pitches)
+    chord_tone = np.zeros(note_count, dtype=np.float32)
+    chord_root_sin = np.zeros(note_count, dtype=np.float32)
+    chord_root_cos = np.ones(note_count, dtype=np.float32)
+    chord_role = np.zeros(note_count, dtype=np.float32)
+    pitch_classes = pitches.astype(np.int64) % 12
+
+    for idx in range(note_count):
+        local = np.flatnonzero(np.abs(starts - starts[idx]) <= onset_tolerance)
+        if len(local) < 2:
+            continue
+
+        root_idx = int(local[np.argmin(pitches[local])])
+        best_root = int(pitch_classes[root_idx])
+        relative_pc = int((pitch_classes[idx] - best_root) % 12)
+        chord_tone[idx] = float(any(relative_pc in intervals for intervals in _TRIAD_INTERVALS.values()))
+        chord_root_phase = 2.0 * np.pi * (best_root / 12.0)
+        chord_root_sin[idx] = float(np.sin(chord_root_phase))
+        chord_root_cos[idx] = float(np.cos(chord_root_phase))
+        if relative_pc == 0:
+            chord_role[idx] = 1.0
+        elif relative_pc in {3, 4}:
+            chord_role[idx] = 2.0 / 3.0
+        elif relative_pc in {6, 7}:
+            chord_role[idx] = 1.0 / 3.0
+
+    return chord_tone, chord_root_sin, chord_root_cos, chord_role
+
+
 def note_features(notes: list[NoteEvent]) -> np.ndarray:
     """Convert note events into normalized model features.
 
@@ -230,6 +295,11 @@ def note_features(notes: list[NoteEvent]) -> np.ndarray:
     in_major_scale = np.asarray([pc in _MAJOR_SCALE_PCS for pc in major_relative_pc], dtype=np.float32)
     in_minor_scale = np.asarray([pc in _MINOR_SCALE_PCS for pc in minor_relative_pc], dtype=np.float32)
     harmonic_density, nearest_harmonic_interval, harmonic_consonance = _harmonic_context_features(starts, pitches)
+    major_degree, minor_degree, major_scale_distance, minor_scale_distance = _scale_degree_features(
+        major_relative_pc,
+        minor_relative_pc,
+    )
+    chord_tone, chord_root_sin, chord_root_cos, chord_role = _local_chord_features(starts, pitches)
 
     return np.stack(
         [
@@ -249,6 +319,14 @@ def note_features(notes: list[NoteEvent]) -> np.ndarray:
             nearest_harmonic_interval,
             harmonic_consonance,
             np.clip(abs_pitch_delta / 12.0, 0.0, 1.0),
+            major_degree,
+            minor_degree,
+            major_scale_distance,
+            minor_scale_distance,
+            chord_tone,
+            chord_root_sin,
+            chord_root_cos,
+            chord_role,
         ],
         axis=1,
     ).astype(np.float32)
