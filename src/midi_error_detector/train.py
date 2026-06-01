@@ -13,6 +13,36 @@ from .data import FEATURE_SIZE, MaestroWrongNoteDataset
 from .model import build_wrong_note_model, masked_bce_with_logits, masked_kind_loss, masked_pitch_loss
 
 
+def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[str, torch.Tensor]) -> tuple[list[str], list[str], list[str]]:
+    """Load matching checkpoint weights and partially copy widened input projections."""
+
+    model_state = model.state_dict()
+    adapted_state = dict(model_state)
+    loaded: list[str] = []
+    partial: list[str] = []
+    skipped: list[str] = []
+    for name, checkpoint_value in checkpoint_state.items():
+        if name not in model_state:
+            skipped.append(name)
+            continue
+        model_value = model_state[name]
+        if model_value.shape == checkpoint_value.shape:
+            adapted_state[name] = checkpoint_value
+            loaded.append(name)
+            continue
+        if name == "input_projection.weight" and model_value.ndim == 2 and checkpoint_value.ndim == 2:
+            copied = model_value.clone()
+            rows = min(model_value.shape[0], checkpoint_value.shape[0])
+            cols = min(model_value.shape[1], checkpoint_value.shape[1])
+            copied[:rows, :cols] = checkpoint_value[:rows, :cols]
+            adapted_state[name] = copied
+            partial.append(f"{name} old={tuple(checkpoint_value.shape)} new={tuple(model_value.shape)} copied_cols={cols}")
+            continue
+        skipped.append(f"{name} old={tuple(checkpoint_value.shape)} new={tuple(model_value.shape)}")
+    model.load_state_dict(adapted_state)
+    return loaded, partial, skipped
+
+
 def f_beta(precision: float, recall: float, beta: float) -> float:
     beta_squared = beta * beta
     return (1.0 + beta_squared) * precision * recall / max(beta_squared * precision + recall, 1e-12)
@@ -346,12 +376,18 @@ def main() -> None:
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        loaded_keys, partial_keys, skipped_keys = load_compatible_state_dict(model, checkpoint["model_state_dict"])
         print(
             f"loaded init checkpoint={args.init_checkpoint} "
             f"stage={checkpoint.get('stage')} epoch={checkpoint.get('epoch')}",
             flush=True,
         )
+        if partial_keys or skipped_keys:
+            print(
+                f"checkpoint compatibility: loaded={len(loaded_keys)} partial={partial_keys} "
+                f"skipped={skipped_keys}",
+                flush=True,
+            )
     args.input_size = FEATURE_SIZE
     print(f"model={args.model} parameters={sum(param.numel() for param in model.parameters()):,}", flush=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)

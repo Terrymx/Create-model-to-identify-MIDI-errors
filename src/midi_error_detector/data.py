@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 ErrorKind = Literal["clean", "neighbor", "nearby", "nearby_plus_touch", "delete_touch"]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
-FEATURE_SIZE = 24
+FEATURE_SIZE = 36
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}
@@ -266,6 +266,92 @@ def _local_chord_features(
     return chord_tone, chord_root_sin, chord_root_cos, chord_role
 
 
+def _estimate_pulse_seconds(starts: np.ndarray) -> float:
+    positive_deltas = np.diff(np.unique(starts))
+    positive_deltas = positive_deltas[(positive_deltas > 0.03) & (positive_deltas < 2.0)]
+    if len(positive_deltas) == 0:
+        return 1.0
+    return float(np.clip(np.median(positive_deltas) * 4.0, 0.25, 2.0))
+
+
+def _melodic_context_features(
+    starts: np.ndarray,
+    pitches: np.ndarray,
+    durations: np.ndarray,
+    chord_tone: np.ndarray,
+    in_major_scale: np.ndarray,
+    in_minor_scale: np.ndarray,
+) -> tuple[np.ndarray, ...]:
+    note_count = len(pitches)
+    prev_pitch = np.roll(pitches, 1)
+    next_pitch = np.roll(pitches, -1)
+    prev_interval = pitches - prev_pitch
+    next_interval = next_pitch - pitches
+    prev_interval[0] = 0.0
+    next_interval[-1] = 0.0
+
+    prev_abs = np.abs(prev_interval)
+    next_abs = np.abs(next_interval)
+    has_prev = np.ones(note_count, dtype=bool)
+    has_next = np.ones(note_count, dtype=bool)
+    has_prev[0] = False
+    has_next[-1] = False
+
+    step_in = ((prev_abs > 0.0) & (prev_abs <= 2.0) & has_prev).astype(np.float32)
+    step_out = ((next_abs > 0.0) & (next_abs <= 2.0) & has_next).astype(np.float32)
+    same_direction = ((prev_interval * next_interval > 0.0) & has_prev & has_next).astype(np.float32)
+    opposite_direction = ((prev_interval * next_interval < 0.0) & has_prev & has_next).astype(np.float32)
+    passing_tone = (step_in.astype(bool) & step_out.astype(bool) & same_direction.astype(bool)).astype(np.float32)
+    neighbor_tone = (
+        step_in.astype(bool)
+        & step_out.astype(bool)
+        & opposite_direction.astype(bool)
+        & (np.abs(prev_pitch - next_pitch) <= 1.0)
+        & has_prev
+        & has_next
+    ).astype(np.float32)
+    resolves_by_step = step_out
+
+    next_chord_tone = np.roll(chord_tone, -1)
+    next_in_scale = np.roll(np.maximum(in_major_scale, in_minor_scale), -1)
+    next_chord_tone[-1] = 0.0
+    next_in_scale[-1] = 0.0
+    non_chord_resolution = (
+        (chord_tone < 0.5)
+        & resolves_by_step.astype(bool)
+        & ((next_chord_tone > 0.5) | (next_in_scale > 0.5))
+    ).astype(np.float32)
+
+    local_duration = np.zeros(note_count, dtype=np.float32)
+    for idx in range(note_count):
+        left = max(0, idx - 1)
+        right = min(note_count, idx + 2)
+        median_duration = float(np.median(durations[left:right])) if right > left else float(durations[idx])
+        local_duration[idx] = float(np.clip(durations[idx] / max(median_duration, 0.03), 0.0, 4.0) / 4.0)
+
+    pulse = _estimate_pulse_seconds(starts)
+    beat_phase = (starts / pulse) % 1.0
+    beat_distance = np.minimum(beat_phase, 1.0 - beat_phase)
+    half_beat_distance = np.abs(beat_phase - 0.5)
+    downbeat_strength = np.clip(1.0 - beat_distance * 4.0, 0.0, 1.0).astype(np.float32)
+    subdivision_strength = np.clip(1.0 - half_beat_distance * 4.0, 0.0, 1.0).astype(np.float32)
+
+    return (
+        np.clip(prev_interval / 24.0, -1.0, 1.0).astype(np.float32),
+        np.clip(next_interval / 24.0, -1.0, 1.0).astype(np.float32),
+        step_in,
+        step_out,
+        same_direction,
+        passing_tone,
+        neighbor_tone,
+        resolves_by_step,
+        non_chord_resolution,
+        local_duration,
+        downbeat_strength,
+        subdivision_strength,
+    )
+
+
 def note_features(notes: list[NoteEvent]) -> np.ndarray:
     """Convert note events into normalized model features.
 
@@ -300,6 +386,20 @@ def note_features(notes: list[NoteEvent]) -> np.ndarray:
         minor_relative_pc,
     )
     chord_tone, chord_root_sin, chord_root_cos, chord_role = _local_chord_features(starts, pitches)
+    (
+        prev_interval,
+        next_interval,
+        step_in,
+        step_out,
+        same_direction,
+        passing_tone,
+        neighbor_tone,
+        resolves_by_step,
+        non_chord_resolution,
+        local_duration,
+        downbeat_strength,
+        subdivision_strength,
+    ) = _melodic_context_features(starts, pitches, durations, chord_tone, in_major_scale, in_minor_scale)
 
     return np.stack(
         [
@@ -327,6 +427,18 @@ def note_features(notes: list[NoteEvent]) -> np.ndarray:
             chord_root_sin,
             chord_root_cos,
             chord_role,
+            prev_interval,
+            next_interval,
+            step_in,
+            step_out,
+            same_direction,
+            passing_tone,
+            neighbor_tone,
+            resolves_by_step,
+            non_chord_resolution,
+            local_duration,
+            downbeat_strength,
+            subdivision_strength,
         ],
         axis=1,
     ).astype(np.float32)

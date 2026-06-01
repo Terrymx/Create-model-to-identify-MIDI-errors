@@ -251,3 +251,44 @@ Smoke-test result:
 | returned candidates | `2` |
 
 The two returned candidates were both high-confidence replacement suggestions from pitch `77` to pitch `76`, with detection probabilities `0.9838` and `0.9780`.
+
+## Run: Melodic-Theory Feature Fine-Tune
+
+Status: started after precision-first post-processing.
+
+Code changes:
+
+- expanded `FEATURE_SIZE` from `24` to `36`
+- added local melodic-context features for passing tone, neighbor tone, stepwise resolution, motion direction, local duration ratio, and approximate metrical strength
+- added compatible checkpoint loading so the old Transformer input projection can copy its first 24 feature columns while new feature columns stay randomly initialized
+
+Planned command:
+
+```powershell
+E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi_error_detector.train `
+  --model transformer `
+  --init-checkpoint checkpoints\transformer_precision_finetune.pt `
+  --data-root "E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 0 `
+  --epochs 24 `
+  --early-stop-patience 7 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rates 0.005 0.01 0.02 0.05 `
+  --error-rate 0.01 `
+  --det-threshold 0.95 `
+  --det-pos-weight 1.0 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.8 0.85 0.9 0.95 0.97 0.98 0.99 `
+  --save-metric precision_task_score `
+  --lr 0.00005 `
+  --lr-patience 3 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.001 `
+  --num-workers 0 `
+  --output checkpoints\transformer_melodic_theory_precision.pt
+```
