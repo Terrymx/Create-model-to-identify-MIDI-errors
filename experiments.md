@@ -201,3 +201,53 @@ Interpretation:
 - Overall task score also improved slightly over the prior Transformer baseline: `0.7800` vs `0.7743`.
 - Recall drops as intended, but remains usable enough for a precision-first workflow where false positives are costly.
 - Next useful step is post-processing: high-confidence reporting, per-piece candidate limits, and optional top-K / local peak filtering before expanding datasets.
+
+## Result: Precision-First Inference Post-Processing
+
+Status: implemented in `src\midi_error_detector\predict.py` after the precision fine-tune.
+
+Purpose:
+
+- prioritize precision for realistic sparse-error use cases where a whole piece may only contain a few wrong notes
+- default to the checkpoint's F0.5-selected threshold before falling back to F1/default training threshold
+- suppress low-confidence and crowded candidates before presenting results to a user
+- support long MIDI files by running inference in overlapping note windows
+
+New inference controls:
+
+| Option | Default | Use |
+| --- | ---: | --- |
+| `--threshold` | checkpoint `best_det_f0_5_threshold` | high precision detection cutoff |
+| `--action-filter` | `non-keep` | remove high-score candidates whose predicted edit action is keep |
+| `--min-action-prob` | `0.0` | optional stricter action-confidence filter |
+| `--max-candidates` | none | per-piece candidate cap |
+| `--min-separation` | `0.0` | suppress nearby lower-confidence candidates |
+| `--sort-by` | `time` | chronological or confidence-ranked output |
+| `--include-summary` | off | include note/window/candidate metadata |
+| `--window-size` | checkpoint `window_size` | notes per inference window |
+| `--window-overlap` | `32` | overlap between windows |
+
+Smoke test:
+
+```powershell
+E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -B -m midi_error_detector.predict `
+  --checkpoint checkpoints\transformer_precision_finetune.pt `
+  --midi "E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0\2004\MIDI-Unprocessed_SMF_02_R1_2004_01-05_ORIG_MID--AUDIO_02_R1_2004_05_Track05_wav.midi" `
+  --top-k 3 `
+  --max-candidates 10 `
+  --min-separation 0.08 `
+  --include-summary
+```
+
+Smoke-test result:
+
+| Metric | Value |
+| --- | ---: |
+| notes | `7894` |
+| windows | `36` |
+| threshold | `0.97` |
+| action filter | `non-keep` |
+| candidate cap | `10` |
+| returned candidates | `2` |
+
+The two returned candidates were both high-confidence replacement suggestions from pitch `77` to pitch `76`, with detection probabilities `0.9838` and `0.9780`.
