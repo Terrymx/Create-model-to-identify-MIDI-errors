@@ -1,0 +1,70 @@
+{
+  "base_checkpoint": "checkpoints\\transformer_melodic_theory_precision.pt",
+  "candidate_threshold": 0.85,
+  "train_split": "train",
+  "eval_split": "test",
+  "train_stats": {
+    "candidate_count": 97347,
+    "positive_count": 84024,
+    "error_notes": 129377,
+    "notes": 11193985
+  },
+  "eval_stats": {
+    "candidate_count": 15040,
+    "positive_count": 10869,
+    "error_notes": 16779,
+    "notes": 1457920
+  },
+  "thresholds": [
+    {
+      "rerank_threshold": 0.3,
+      "tp": 10126,
+      "fp": 2788,
+      "fn": 743,
+      "precision": 0.7841102679262816,
+      "recall": 0.9316404453031558,
+      "f1": 0.8515326073245596,
+      "f0_5": 0.8097560975609757
+    },
+    {
+      "rerank_threshold": 0.4,
+      "tp": 9418,
+      "fp": 2111,
+      "fn": 1451,
+      "precision": 0.8168965218145546,
+      "recall": 0.8665010580550189,
+      "f1": 0.8409679435663898,
+      "f0_5": 0.8263578134596824
+    },
+    {
+      "rerank_threshold": 0.5,
+      "tp": 8407,
+      "fp": 1496,
+      "fn": 2462,
+      "precision": 0.8489346662627487,
+      "recall": 0.7734842211795013,
+      "f1": 0.8094550356248796,
+      "f0_5": 0.8326895267526395
+    },
+    {
+      "rerank_threshold": 0.6,
+      "tp": 6798,
+      "fp": 851,
+      "fn": 4071,
+      "precision": 0.8887436266178586,
+      "recall": 0.6254485233232128,
+      "f1": 0.7342045577276163,
+      "f0_5": 0.819727481008079
+    },
+    {
+      "rerank_threshold": 0.7,
+      "tp": 4317,
+      "fp": 324,
+      "fn": 6552,
+      "precision": 0.9301874595992243,
+      "recall": 0.3971846536019873,
+      "f1": 0.5566731141199227,
+      "f0_5": 0.7333605137091022
+    }
+  ]
+}

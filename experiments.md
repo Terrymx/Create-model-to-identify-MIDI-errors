@@ -359,3 +359,35 @@ Interpretation:
 - Simple harmony-gain filtering is too blunt: it removes false positives, but it removes many more true positives.
 - Strict `min_gain_0.05` gets precision to `0.8804`, but recall collapses from `0.5102` to `0.3533`, so F0.5 drops sharply.
 - Classical harmony is still likely useful, but not as a hard filter based on local triad membership. The next version should use per-piece top-K reranking or a learned calibration head instead of dropping all candidates with weak harmony gain.
+
+## Result: Candidate Threshold Sweep
+
+Status: completed first-stage threshold sweep for the two-stage reranker plan.
+
+Purpose:
+
+- check whether a lower first-stage threshold can provide enough candidate recall for a second-stage reranker to reach the long-term `80/80+` precision/recall target
+- use the same sparse synthetic setting as the previous evaluations
+
+Evaluation setup:
+
+- checkpoint: `checkpoints\transformer_melodic_theory_precision.pt`
+- test split, synthetic `error_rate=0.01`
+- candidate definition: `error_probability >= threshold` and predicted action is not keep
+- total error notes: `16779`
+
+| Candidate Threshold | Precision | Recall | F0.5 | TP | FP | FN | Candidates |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `0.50` | `0.5273` | `0.7766` | `0.5635` | `13031` | `11681` | `3748` | `24712` |
+| `0.60` | `0.5750` | `0.7481` | `0.6029` | `12552` | `9276` | `4227` | `21828` |
+| `0.70` | `0.6270` | `0.7140` | `0.6427` | `11981` | `7126` | `4798` | `19107` |
+| `0.75` | `0.6557` | `0.6971` | `0.6636` | `11697` | `6141` | `5082` | `17838` |
+| `0.80` | `0.6873` | `0.6752` | `0.6849` | `11330` | `5154` | `5449` | `16484` |
+| `0.85` | `0.7227` | `0.6478` | `0.7063` | `10869` | `4171` | `5910` | `15040` |
+
+Interpretation:
+
+- Even at candidate threshold `0.50`, first-stage recall is only `0.7766`, below the desired `0.80+` target.
+- Lowering the threshold further may cross `0.80`, but it will produce a very large false-positive pool and may be hard for a small reranker to recover precision from.
+- This means the current 80/80 bottleneck is mainly first-stage candidate generation, not only second-stage filtering.
+- Next optimization should focus on changing the synthetic error generation and training objective so the base Transformer assigns higher probabilities to currently missed true errors.
