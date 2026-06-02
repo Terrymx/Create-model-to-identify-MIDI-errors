@@ -292,3 +292,38 @@ E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi
   --num-workers 0 `
   --output checkpoints\transformer_melodic_theory_precision.pt
 ```
+
+Final result:
+
+Status: completed 24 corrupt-stage epochs. Best checkpoint saved at epoch 24 by `precision_task_score`.
+
+Checkpoint: `checkpoints\transformer_melodic_theory_precision.pt`.
+
+Best checkpoint metrics:
+
+| Metric | Value |
+| --- | ---: |
+| `epoch` | `24` |
+| `precision_task_score` | `0.8108` |
+| `task_score` | `0.7790` |
+| `best_det_f0_5` | `0.7620` |
+| `best_det_f0_5_precision` | `0.8693` |
+| `best_det_f0_5_recall` | `0.5102` |
+| `best_det_f0_5_threshold` | `0.97` |
+| `best_det_f1` | `0.6832` |
+| `best_det_precision` | `0.7227` |
+| `best_det_recall` | `0.6478` |
+| `best_det_threshold` | `0.85` |
+| `det_precision` at threshold `0.95` | `0.8321` |
+| `det_recall` at threshold `0.95` | `0.5533` |
+| `det_f1` at threshold `0.95` | `0.6646` |
+| `det_f0_5` at threshold `0.95` | `0.7559` |
+| `replace_pitch_top3` | `0.9116` |
+| `replace_kind_acc` | `0.8382` |
+| `delete_kind_acc` | `0.9685` |
+
+Interpretation:
+
+- The melodic-theory features produced a tiny `precision_task_score` improvement over the previous precision fine-tune: `0.8108` vs `0.8106`.
+- Precision did not improve: F0.5-selected precision moved from `0.8753` to `0.8693`, while recall improved from `0.5006` to `0.5102`.
+- This means the new features are not a clear precision win yet. They may be helping borderline recall/action behavior, but the next precision-focused step should be calibration/post-processing on per-piece false positives rather than simply training longer.
