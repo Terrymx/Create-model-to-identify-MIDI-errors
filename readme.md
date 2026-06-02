@@ -89,10 +89,6 @@ Current Transformer-family checkpoints:
 - `checkpoints\transformer_theory_weighted_recall.pt`: current theory-weighted recall run, intended to recover recall while keeping precision high.
 
 The current target is not only a higher `task_score`; the practical target is to push both precision and recall toward 80%+ under realistic sparse wrong-note conditions.
-
-# Welcome to GitHub Desktop!
-
-This is your README. READMEs are where you can communicate what your project is and how to use it.
 这个项目提供一个面向 **AI 识谱后处理** 的 PyTorch 原型：输入已经转成 MIDI 的演奏结果，模型在 note-level 上判断哪些音可能是错音，并预测应替换成的正确 MIDI pitch。
 
 Write your name on line 6, save it, and then head back to GitHub Desktop.
