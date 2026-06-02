@@ -1,5 +1,96 @@
+# MIDI Wrong-Note Detection with Transformer and BiGRU
+
+## Current Project Status
+
+This project has moved beyond the original BiGRU prototype. The main experimental line is now a Transformer-based MIDI wrong-note detector with synthetic error generation, chord/scale/degree features, melodic-theory features, precision-first calibration, and post-processing/reranking experiments.
+
+The original BiGRU notes are kept below for history, but the current checkpoints and experiments should be read from:
+
+- `experiments.md`: chronological experiment log and iteration path.
+- `training_logs\*.log`: stdout logs for each long run.
+- `training_logs\*.err.log`: stderr/progress logs.
+- `checkpoints\*.pt`: saved model checkpoints.
+
+## Important 40-Epoch Baseline
+
+The previously important 40-epoch run used the BiGRU/default model line with theory/scheduler settings:
+
+```powershell
+cd E:\downloads\桌面\dku\CS309\project\code_new
+
+E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -u -m midi_error_detector.train `
+  --data-root "E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 1 `
+  --epochs 40 `
+  --batch-size 16 `
+  --window-size 256 `
+  --train-error-rate 0.15 `
+  --error-rate 0.08 `
+  --det-threshold 0.3 `
+  --det-pos-weight 3.0 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.2 0.25 0.3 0.35 0.4 0.5 `
+  --save-metric task_score `
+  --lr-patience 4 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.002 `
+  --num-workers 0 `
+  --output checkpoints\bigru_wrong_note_theory_scheduler_taskscore.pt
+```
+
+Final epoch 40 test metrics:
+
+- `task_score=0.774284316890155`
+- fixed `det_threshold=0.3`: precision `0.4884`, recall `0.8842`, F1 `0.6293`
+- best threshold `0.5`: precision `0.5994`, recall `0.8343`, F1 `0.6976`
+- `replace_pitch_top3=0.8500`
+- `replace_kind_acc=0.8520`
+- `delete_kind_acc=0.9383`
+
+This run had high recall but low precision, which is why the later work shifted toward low-error-rate evaluation, precision-first fine-tuning, and high-confidence post-processing.
+
+## Transformer 40-Epoch Version
+
+The Transformer version keeps the same wrong-note task but changes the sequence encoder from BiGRU to self-attention:
+
+```powershell
+cd E:\downloads\桌面\dku\CS309\project\code_new
+
+E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -u -m midi_error_detector.train `
+  --model transformer `
+  --data-root "E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 1 `
+  --epochs 40 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rate 0.15 `
+  --error-rate 0.08 `
+  --det-threshold 0.3 `
+  --det-pos-weight 3.0 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.2 0.25 0.3 0.35 0.4 0.5 `
+  --save-metric task_score `
+  --lr-patience 4 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.002 `
+  --num-workers 0 `
+  --output checkpoints\transformer_wrong_note_taskscore.pt
+```
+
+Current Transformer-family checkpoints:
+
+- `checkpoints\transformer_chord_degree_taskscore.pt`: Transformer with chord/degree features.
+- `checkpoints\transformer_precision_finetune.pt`: low-error-rate precision-first fine-tune. Best result: precision-task score `0.8106`, precision `0.8753`, recall `0.5006` at threshold `0.97`.
+- `checkpoints\transformer_melodic_theory_precision.pt`: melodic theory feature version. Best result: precision-task score `0.8108`, precision `0.8693`, recall `0.5102` at threshold `0.97`.
+- `checkpoints\transformer_theory_weighted_recall.pt`: current theory-weighted recall run, intended to recover recall while keeping precision high.
+
+The current target is not only a higher `task_score`; the practical target is to push both precision and recall toward 80%+ under realistic sparse wrong-note conditions.
+
 # Welcome to GitHub Desktop!
-# MIDI Wrong-Note Detection with BiGRU
 
 This is your README. READMEs are where you can communicate what your project is and how to use it.
 这个项目提供一个面向 **AI 识谱后处理** 的 PyTorch 原型：输入已经转成 MIDI 的演奏结果，模型在 note-level 上判断哪些音可能是错音，并预测应替换成的正确 MIDI pitch。
