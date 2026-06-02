@@ -391,3 +391,66 @@ Interpretation:
 - Lowering the threshold further may cross `0.80`, but it will produce a very large false-positive pool and may be hard for a small reranker to recover precision from.
 - This means the current 80/80 bottleneck is mainly first-stage candidate generation, not only second-stage filtering.
 - Next optimization should focus on changing the synthetic error generation and training objective so the base Transformer assigns higher probabilities to currently missed true errors.
+
+## Run: Theory-Weighted Recall Fine-Tune
+
+Status: started after candidate threshold sweep showed first-stage recall is the main bottleneck.
+
+Purpose:
+
+- keep the overall task as wrong-note detection
+- improve first-stage candidate recall so a later reranker has enough true errors to work with
+- use music theory more directly in training instead of only as input features
+
+Code changes:
+
+- added more classical-piano-oriented synthetic error types:
+  - `scale_slip`
+  - `chord_slip`
+  - `octave_displacement`
+- kept existing nearby, neighbor, and extra-touch corruptions
+- added per-note detection loss weights:
+  - theory-plausible clean notes can receive extra negative-class protection
+  - theory-suspicious corrupted notes can receive extra positive-class weight
+- exposed training args:
+  - `--clean-theory-weight`
+  - `--error-theory-weight`
+
+Planned command:
+
+```powershell
+E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi_error_detector.train `
+  --model transformer `
+  --init-checkpoint checkpoints\transformer_melodic_theory_precision.pt `
+  --data-root "E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 0 `
+  --epochs 24 `
+  --early-stop-patience 7 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rates 0.01 0.02 0.05 0.10 `
+  --error-rate 0.01 `
+  --det-threshold 0.7 `
+  --det-pos-weight 2.0 `
+  --clean-theory-weight 1.5 `
+  --error-theory-weight 2.0 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.4 0.5 0.6 0.7 0.8 0.85 0.9 `
+  --save-metric best_det_f1 `
+  --lr 0.00005 `
+  --lr-patience 3 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.001 `
+  --num-workers 0 `
+  --output checkpoints\transformer_theory_weighted_recall.pt
+```
+
+Success criteria:
+
+- first-stage candidate recall should exceed the previous `0.7766` at threshold `0.50`
+- ideally threshold `0.50` candidate recall should cross `0.80`
+- precision can be lower at this stage, but should not collapse so badly that reranking becomes unrealistic

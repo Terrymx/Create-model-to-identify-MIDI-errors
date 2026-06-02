@@ -138,8 +138,11 @@ def masked_bce_with_logits(
     labels: torch.Tensor,
     mask: torch.Tensor,
     pos_weight: torch.Tensor | None = None,
+    sample_weight: torch.Tensor | None = None,
 ) -> torch.Tensor:
     loss = nn.functional.binary_cross_entropy_with_logits(logits, labels, reduction="none", pos_weight=pos_weight)
+    if sample_weight is not None:
+        loss = loss * sample_weight
     return (loss * mask).sum() / mask.sum().clamp_min(1.0)
 
 

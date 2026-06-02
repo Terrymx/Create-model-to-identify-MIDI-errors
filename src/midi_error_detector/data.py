@@ -20,7 +20,16 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-ErrorKind = Literal["clean", "neighbor", "nearby", "nearby_plus_touch", "delete_touch"]
+ErrorKind = Literal[
+    "clean",
+    "neighbor",
+    "nearby",
+    "nearby_plus_touch",
+    "scale_slip",
+    "chord_slip",
+    "octave_displacement",
+    "delete_touch",
+]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
 FEATURE_SIZE = 36
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
@@ -100,6 +109,37 @@ def _random_pitch_shift(rng: np.random.Generator, max_shift: int) -> int:
     return shift
 
 
+def _pitch_class_distance_to_scale(pitch: int, tonic: int, scale_pcs: set[int]) -> float:
+    relative_pc = (int(pitch) - tonic) % 12
+    return _nearest_scale_distance(relative_pc, scale_pcs)
+
+
+def _choose_scale_slip(note: NoteEvent, rng: np.random.Generator, tonic: int, scale_pcs: set[int], low: int, high: int) -> int:
+    candidates = [_clip_pitch(note.pitch + shift, low, high) for shift in (-2, -1, 1, 2)]
+    candidates = [pitch for pitch in candidates if pitch != note.pitch]
+    candidates.sort(key=lambda pitch: _pitch_class_distance_to_scale(pitch, tonic, scale_pcs), reverse=True)
+    best = candidates[: max(1, min(2, len(candidates)))]
+    return int(rng.choice(best))
+
+
+def _choose_chord_slip(
+    note: NoteEvent,
+    same_onset_pitches: list[int],
+    rng: np.random.Generator,
+    low: int,
+    high: int,
+) -> int:
+    if not same_onset_pitches:
+        return _clip_pitch(note.pitch + int(rng.choice([-1, 1])), low, high)
+    root = min(same_onset_pitches) % 12
+    chord_pcs = set()
+    for intervals in _TRIAD_INTERVALS.values():
+        chord_pcs.update((root + interval) % 12 for interval in intervals)
+    candidates = [_clip_pitch(note.pitch + shift, low, high) for shift in (-2, -1, 1, 2)]
+    non_chord = [pitch for pitch in candidates if pitch != note.pitch and pitch % 12 not in chord_pcs]
+    return int(rng.choice(non_chord or [pitch for pitch in candidates if pitch != note.pitch]))
+
+
 def corrupt_note_window(
     notes: Iterable[NoteEvent],
     rng: np.random.Generator,
@@ -125,12 +165,22 @@ def corrupt_note_window(
     of replaced.
     """
 
+    original_notes = list(notes)
+    if original_notes:
+        pitches = np.asarray([note.pitch for note in original_notes], dtype=np.float32)
+        durations = np.asarray([note.duration for note in original_notes], dtype=np.float32)
+        starts = np.asarray([note.start for note in original_notes], dtype=np.float32)
+        major_tonic, minor_tonic = _estimate_key_tonics(pitches, durations)
+    else:
+        starts = np.asarray([], dtype=np.float32)
+        major_tonic, minor_tonic = 0, 0
+
     corrupted: list[NoteEvent] = []
     error_labels: list[int] = []
     target_pitches: list[int] = []
     kinds: list[ErrorKind] = []
 
-    for note in notes:
+    for note_idx, note in enumerate(original_notes):
         if rng.random() >= error_rate:
             corrupted.append(note)
             error_labels.append(0)
@@ -138,9 +188,25 @@ def corrupt_note_window(
             kinds.append("clean")
             continue
 
-        error_type = rng.choice(["neighbor", "nearby", "nearby_plus_touch"], p=[0.45, 0.40, 0.15])
+        error_type = rng.choice(
+            ["neighbor", "nearby", "nearby_plus_touch", "scale_slip", "chord_slip", "octave_displacement"],
+            p=[0.28, 0.27, 0.13, 0.16, 0.11, 0.05],
+        )
         if error_type == "neighbor":
             new_pitch = _clip_pitch(note.pitch + int(rng.choice([-1, 1])), piano_low, piano_high)
+        elif error_type == "scale_slip":
+            if rng.random() < 0.5:
+                new_pitch = _choose_scale_slip(note, rng, major_tonic, _MAJOR_SCALE_PCS, piano_low, piano_high)
+            else:
+                new_pitch = _choose_scale_slip(note, rng, minor_tonic, _MINOR_SCALE_PCS, piano_low, piano_high)
+        elif error_type == "chord_slip":
+            same_onset = np.flatnonzero(np.abs(starts - note.start) <= 0.08).tolist()
+            same_onset_pitches = [original_notes[idx].pitch for idx in same_onset if idx != note_idx]
+            new_pitch = _choose_chord_slip(note, same_onset_pitches, rng, piano_low, piano_high)
+        elif error_type == "octave_displacement":
+            new_pitch = _clip_pitch(note.pitch + int(rng.choice([-12, 12])), piano_low, piano_high)
+            if new_pitch == note.pitch:
+                new_pitch = _clip_pitch(note.pitch + _random_pitch_shift(rng, nearby_max_shift), piano_low, piano_high)
         else:
             new_pitch = _clip_pitch(note.pitch + _random_pitch_shift(rng, nearby_max_shift), piano_low, piano_high)
 
@@ -444,6 +510,36 @@ def note_features(notes: list[NoteEvent]) -> np.ndarray:
     ).astype(np.float32)
 
 
+def theory_detection_weights(
+    features: np.ndarray,
+    is_error: np.ndarray,
+    clean_weight: float = 1.0,
+    error_weight: float = 1.0,
+) -> np.ndarray:
+    """Return per-note detection loss weights from lightweight theory cues."""
+
+    weights = np.ones(len(is_error), dtype=np.float32)
+    if len(is_error) == 0:
+        return weights
+
+    in_major_scale = features[:, 8] >= 0.5
+    in_minor_scale = features[:, 9] >= 0.5
+    chord_tone = features[:, 20] >= 0.5
+    step_in = features[:, 26] >= 0.5
+    step_out = features[:, 27] >= 0.5
+    passing_tone = features[:, 29] >= 0.5
+    neighbor_tone = features[:, 30] >= 0.5
+    non_chord_resolution = features[:, 32] >= 0.5
+    short_or_normal_duration = features[:, 33] <= 0.35
+
+    scale_tone = in_major_scale | in_minor_scale
+    protected_clean = chord_tone | passing_tone | neighbor_tone | non_chord_resolution | (scale_tone & step_in & step_out)
+    suspicious_error = (~scale_tone) | (~chord_tone & short_or_normal_duration) | (np.abs(features[:, 4]) >= 0.20)
+    weights[(is_error < 0.5) & protected_clean] = clean_weight
+    weights[(is_error >= 0.5) & suspicious_error] = error_weight
+    return weights
+
+
 class MaestroWrongNoteDataset(Dataset):
     """Windowed MAESTRO MIDI dataset with online synthetic wrong-note labels."""
 
@@ -459,6 +555,8 @@ class MaestroWrongNoteDataset(Dataset):
         max_files: int | None = None,
         cache_notes: bool = True,
         verbose: bool = True,
+        clean_theory_weight: float = 1.0,
+        error_theory_weight: float = 1.0,
     ) -> None:
         self.root = Path(root)
         self.split = split
@@ -469,6 +567,8 @@ class MaestroWrongNoteDataset(Dataset):
         self.epoch = 0
         self.cache_notes = cache_notes
         self.verbose = verbose
+        self.clean_theory_weight = clean_theory_weight
+        self.error_theory_weight = error_theory_weight
 
         metadata = load_maestro_metadata(self.root, split, version)
         if max_files is not None:
@@ -531,6 +631,12 @@ class MaestroWrongNoteDataset(Dataset):
         )[: self.window_size]
         length = len(corrupted)
         features = note_features(corrupted)
+        det_weight = theory_detection_weights(
+            features,
+            is_error,
+            clean_weight=self.clean_theory_weight,
+            error_weight=self.error_theory_weight,
+        )
 
         pad = self.window_size - length
         if pad > 0:
@@ -538,6 +644,7 @@ class MaestroWrongNoteDataset(Dataset):
             is_error = np.pad(is_error, (0, pad))
             target_pitch = np.pad(target_pitch, (0, pad))
             kind_ids = np.pad(kind_ids, (0, pad))
+            det_weight = np.pad(det_weight, (0, pad))
 
         mask = np.zeros(self.window_size, dtype=np.float32)
         mask[:length] = 1.0
@@ -546,5 +653,6 @@ class MaestroWrongNoteDataset(Dataset):
             "is_error": torch.from_numpy(is_error.astype(np.float32)),
             "target_pitch": torch.from_numpy(target_pitch.astype(np.int64)),
             "error_kind": torch.from_numpy(kind_ids.astype(np.int64)),
+            "det_weight": torch.from_numpy(det_weight.astype(np.float32)),
             "mask": torch.from_numpy(mask),
         }

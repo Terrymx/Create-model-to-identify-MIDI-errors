@@ -112,6 +112,18 @@ def parse_args() -> argparse.Namespace:
         help="Positive-class weight for wrong-note detection BCE; increase if recall is too low.",
     )
     parser.add_argument(
+        "--clean-theory-weight",
+        type=float,
+        default=1.0,
+        help="Extra detection-loss weight for theory-plausible clean notes.",
+    )
+    parser.add_argument(
+        "--error-theory-weight",
+        type=float,
+        default=1.0,
+        help="Extra detection-loss weight for theory-suspicious corrupted notes.",
+    )
+    parser.add_argument(
         "--kind-class-weights",
         type=float,
         nargs=3,
@@ -171,6 +183,8 @@ def make_loader(args: argparse.Namespace, split: str, shuffle: bool, error_rate:
         max_files=args.max_files,
         cache_notes=args.cache_notes,
         verbose=not args.quiet,
+        clean_theory_weight=args.clean_theory_weight,
+        error_theory_weight=args.error_theory_weight,
     )
     print(f"{split} loader ready: files={len(dataset.files)}, windows={len(dataset)}", flush=True)
     return DataLoader(
@@ -228,11 +242,18 @@ def run_epoch(
         is_error = batch["is_error"].to(device)
         target_pitch = batch["target_pitch"].to(device)
         error_kind = batch["error_kind"].to(device)
+        det_weight = batch["det_weight"].to(device)
         mask = batch["mask"].to(device)
 
         with torch.set_grad_enabled(training):
             outputs = model(features)
-            det_loss = masked_bce_with_logits(outputs["error_logits"], is_error, mask, pos_weight=det_pos_weight)
+            det_loss = masked_bce_with_logits(
+                outputs["error_logits"],
+                is_error,
+                mask,
+                pos_weight=det_pos_weight,
+                sample_weight=det_weight,
+            )
             pitch_mask = mask * (error_kind != 2).float()
             pitch_loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, pitch_mask)
             kind_loss = masked_kind_loss(outputs["kind_logits"], error_kind, mask, class_weight=kind_class_weight)
