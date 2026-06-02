@@ -91,7 +91,6 @@ Current Transformer-family checkpoints:
 The current target is not only a higher `task_score`; the practical target is to push both precision and recall toward 80%+ under realistic sparse wrong-note conditions.
 这个项目提供一个面向 **AI 识谱后处理** 的 PyTorch 原型：输入已经转成 MIDI 的演奏结果，模型在 note-level 上判断哪些音可能是错音，并预测应替换成的正确 MIDI pitch。
 
-Write your name on line 6, save it, and then head back to GitHub Desktop.
 ## 数据集确认
 
 MAESTRO 官网（`http://g.co/magenta/maestro-dataset` 会跳转到 Magenta 页面）说明：
