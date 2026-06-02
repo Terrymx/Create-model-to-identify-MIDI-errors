@@ -7,4 +7,6 @@ build/
 dist/
 training_logs/*.log
 training_logs/*.err.log
+checkpoints/*.pt
 checkpoints/smoke_*.pt
+LOCAL_NOTES.md
