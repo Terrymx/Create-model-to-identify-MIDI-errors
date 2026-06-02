@@ -9,6 +9,7 @@ import sys
 import torch
 
 from .data import extract_note_events, note_features
+from .harmony import harmony_scores_for_pitches
 from .model import build_wrong_note_model
 
 ACTION_NAMES = ["keep", "replace", "delete"]
@@ -64,6 +65,36 @@ def parse_args() -> argparse.Namespace:
         help="Return an object with summary metadata and candidates instead of a raw candidate list.",
     )
     parser.add_argument(
+        "--harmony-gain-weight",
+        type=float,
+        default=0.0,
+        help="Add this multiplier times harmony_gain to adjusted_confidence_score. Default keeps model score unchanged.",
+    )
+    parser.add_argument(
+        "--chord-tone-penalty",
+        type=float,
+        default=0.0,
+        help="Subtract this amount when the input pitch is already harmony-consistent and the replacement does not improve it.",
+    )
+    parser.add_argument(
+        "--harmony-current-threshold",
+        type=float,
+        default=0.65,
+        help="Current-pitch harmony score that triggers chord-tone style protection for the penalty.",
+    )
+    parser.add_argument(
+        "--min-harmony-gain",
+        type=float,
+        default=None,
+        help="Drop replace candidates whose top replacement pitch is less harmonically plausible by more than this gain.",
+    )
+    parser.add_argument(
+        "--harmony-onset-tolerance",
+        type=float,
+        default=0.08,
+        help="Seconds around a note onset used to estimate local harmony for post-processing.",
+    )
+    parser.add_argument(
         "--window-size",
         type=int,
         default=None,
@@ -95,7 +126,7 @@ def _suppress_close_candidates(candidates: list[dict], min_separation: float) ->
         return candidates
 
     kept: list[dict] = []
-    for candidate in sorted(candidates, key=lambda item: item["confidence_score"], reverse=True):
+    for candidate in sorted(candidates, key=lambda item: item.get("adjusted_confidence_score", item["confidence_score"]), reverse=True):
         if all(abs(float(candidate["start"]) - float(existing["start"])) > min_separation for existing in kept):
             kept.append(candidate)
     return kept
@@ -190,6 +221,12 @@ def main() -> None:
                     pitch_scores[global_idx, :top_k] = window_pitch_scores[local_idx]
                     pitch_indices[global_idx, :top_k] = window_pitch_indices[local_idx]
     actions = action_probabilities.argmax(dim=-1)
+    top_replacement_pitches = [int(pitch_indices[idx, 0]) for idx in range(len(notes))]
+    harmony_current, harmony_candidate, harmony_gain = harmony_scores_for_pitches(
+        notes,
+        top_replacement_pitches,
+        onset_tolerance=args.harmony_onset_tolerance,
+    )
 
     results = []
     for idx, note in enumerate(notes):
@@ -204,6 +241,19 @@ def main() -> None:
             continue
         if action_probability < args.min_action_prob:
             continue
+        if action_name == "replace" and args.min_harmony_gain is not None and harmony_gain[idx] < args.min_harmony_gain:
+            continue
+        confidence_score = _candidate_confidence(probability, keep_probability, action_probability)
+        adjusted_confidence_score = confidence_score + args.harmony_gain_weight * harmony_gain[idx]
+        harmony_penalty_applied = False
+        if (
+            action_name == "replace"
+            and args.chord_tone_penalty > 0.0
+            and harmony_current[idx] >= args.harmony_current_threshold
+            and harmony_gain[idx] <= 0.0
+        ):
+            adjusted_confidence_score -= args.chord_tone_penalty
+            harmony_penalty_applied = True
         results.append(
             {
                 "note_index": idx,
@@ -220,13 +270,18 @@ def main() -> None:
                     for rank in range(reported_top_k)
                 ],
                 "error_probability": probability,
-                "confidence_score": _candidate_confidence(probability, keep_probability, action_probability),
+                "confidence_score": confidence_score,
+                "adjusted_confidence_score": adjusted_confidence_score,
+                "harmony_current_score": harmony_current[idx],
+                "harmony_candidate_score": harmony_candidate[idx],
+                "harmony_gain": harmony_gain[idx],
+                "harmony_penalty_applied": harmony_penalty_applied,
                 "detection_threshold": threshold,
             }
         )
 
     results = _suppress_close_candidates(results, args.min_separation)
-    results.sort(key=lambda item: item["confidence_score"], reverse=True)
+    results.sort(key=lambda item: item["adjusted_confidence_score"], reverse=True)
     if args.max_candidates is not None:
         results = results[: max(args.max_candidates, 0)]
     if args.sort_by == "time":
@@ -243,6 +298,11 @@ def main() -> None:
             "min_action_prob": args.min_action_prob,
             "max_candidates": args.max_candidates,
             "min_separation": args.min_separation,
+            "harmony_gain_weight": args.harmony_gain_weight,
+            "chord_tone_penalty": args.chord_tone_penalty,
+            "harmony_current_threshold": args.harmony_current_threshold,
+            "min_harmony_gain": args.min_harmony_gain,
+            "harmony_onset_tolerance": args.harmony_onset_tolerance,
             "window_size": window_size,
             "window_overlap": args.window_overlap,
             "window_count": len(windows),

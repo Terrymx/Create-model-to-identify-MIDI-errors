@@ -327,3 +327,35 @@ Interpretation:
 - The melodic-theory features produced a tiny `precision_task_score` improvement over the previous precision fine-tune: `0.8108` vs `0.8106`.
 - Precision did not improve: F0.5-selected precision moved from `0.8753` to `0.8693`, while recall improved from `0.5006` to `0.5102`.
 - This means the new features are not a clear precision win yet. They may be helping borderline recall/action behavior, but the next precision-focused step should be calibration/post-processing on per-piece false positives rather than simply training longer.
+
+## Result: Harmony-Aware Post-Processing Probe
+
+Status: tested without retraining.
+
+Code changes:
+
+- added lightweight harmony scoring in `src\midi_error_detector\harmony.py`
+- added optional harmony metadata and adjusted ranking to `predict.py`
+- added `scripts\evaluate_harmony_postprocess.py` to sweep harmony filters on sparse-error evaluation
+
+Evaluation setup:
+
+- checkpoint: `checkpoints\transformer_melodic_theory_precision.pt`
+- test split, synthetic `error_rate=0.01`
+- detection threshold `0.97`
+- baseline means `probability >= 0.97` and predicted action is not keep
+
+| Strategy | TP | FP | FN | Precision | Recall | F0.5 | FP Drop | TP Drop |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| baseline | `8560` | `1287` | `8219` | `0.8693` | `0.5102` | `0.7620` | `0` | `0` |
+| `min_gain_-0.10` | `7533` | `1149` | `9246` | `0.8677` | `0.4490` | `0.7313` | `138` | `1027` |
+| `min_gain_0.00` | `7351` | `1108` | `9428` | `0.8690` | `0.4381` | `0.7262` | `179` | `1209` |
+| `min_gain_0.05` | `5928` | `805` | `10851` | `0.8804` | `0.3533` | `0.6781` | `482` | `2632` |
+| `protect_current_0.65_no_gain` | `6987` | `1045` | `9792` | `0.8699` | `0.4164` | `0.7143` | `242` | `1573` |
+| `protect_current_0.75_no_gain` | `7018` | `1048` | `9761` | `0.8701` | `0.4183` | `0.7155` | `239` | `1542` |
+
+Interpretation:
+
+- Simple harmony-gain filtering is too blunt: it removes false positives, but it removes many more true positives.
+- Strict `min_gain_0.05` gets precision to `0.8804`, but recall collapses from `0.5102` to `0.3533`, so F0.5 drops sharply.
+- Classical harmony is still likely useful, but not as a hard filter based on local triad membership. The next version should use per-piece top-K reranking or a learned calibration head instead of dropping all candidates with weak harmony gain.

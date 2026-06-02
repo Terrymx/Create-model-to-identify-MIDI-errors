@@ -1,0 +1,404 @@
+[
+  {
+    "label": "precision_24feat",
+    "checkpoint": "checkpoints\\transformer_precision_finetune.pt",
+    "input_size": 24,
+    "total_clean": 1441141,
+    "total_error": 16779,
+    "thresholds": {
+      "0.95": {
+        "raw": {
+          "tp": 9148,
+          "fp": 1729,
+          "fn": 7631,
+          "precision": 0.8410407281419509,
+          "recall": 0.5452053161690208,
+          "fp_analysis": {
+            "count": 1729,
+            "mean_error_prob": 0.9778914148921978,
+            "mean_keep_prob": 0.004006228278336323,
+            "mean_replace_prob": 0.9340809706245436,
+            "mean_delete_prob": 0.06191280019866346,
+            "feature_rates": {
+              "chord_tone": 0.45864661654135336,
+              "step_in": 0.1249277038750723,
+              "step_out": 0.14401388085598613,
+              "same_direction": 0.37189126662810873,
+              "passing_tone": 0.014459224985540775,
+              "neighbor_tone": 0.01098901098901099,
+              "resolves_by_step": 0.14401388085598613,
+              "non_chord_resolution": 0.0913823019086177,
+              "short_or_normal_duration": 0.8872180451127819,
+              "downbeat_strength": 0.25968768074031234,
+              "subdivision_strength": 0.25216888374783114
+            }
+          },
+          "tp_analysis": {
+            "count": 9148,
+            "mean_error_prob": 0.9917357888058069,
+            "mean_keep_prob": 0.0014371354233666054,
+            "mean_replace_prob": 0.7803789735830763,
+            "mean_delete_prob": 0.21818388863369212,
+            "feature_rates": {
+              "chord_tone": 0.5066681241801486,
+              "step_in": 0.13379973764757325,
+              "step_out": 0.13740708351552253,
+              "same_direction": 0.3384346305203323,
+              "passing_tone": 0.01060341058154788,
+              "neighbor_tone": 0.017162221250546568,
+              "resolves_by_step": 0.13740708351552253,
+              "non_chord_resolution": 0.07345867949278531,
+              "short_or_normal_duration": 0.8871884564932225,
+              "downbeat_strength": 0.25021862702229997,
+              "subdivision_strength": 0.2644293834717971
+            }
+          }
+        },
+        "reported_non_keep": {
+          "tp": 9148,
+          "fp": 1729,
+          "fn": 7631,
+          "precision": 0.8410407281419509,
+          "recall": 0.5452053161690208,
+          "fp_analysis": {
+            "count": 1729,
+            "mean_error_prob": 0.9778914148921978,
+            "mean_keep_prob": 0.004006228278336323,
+            "mean_replace_prob": 0.9340809706245436,
+            "mean_delete_prob": 0.06191280019866346,
+            "feature_rates": {
+              "chord_tone": 0.45864661654135336,
+              "step_in": 0.1249277038750723,
+              "step_out": 0.14401388085598613,
+              "same_direction": 0.37189126662810873,
+              "passing_tone": 0.014459224985540775,
+              "neighbor_tone": 0.01098901098901099,
+              "resolves_by_step": 0.14401388085598613,
+              "non_chord_resolution": 0.0913823019086177,
+              "short_or_normal_duration": 0.8872180451127819,
+              "downbeat_strength": 0.25968768074031234,
+              "subdivision_strength": 0.25216888374783114
+            }
+          },
+          "tp_analysis": {
+            "count": 9148,
+            "mean_error_prob": 0.9917357888058069,
+            "mean_keep_prob": 0.0014371354233666054,
+            "mean_replace_prob": 0.7803789735830763,
+            "mean_delete_prob": 0.21818388863369212,
+            "feature_rates": {
+              "chord_tone": 0.5066681241801486,
+              "step_in": 0.13379973764757325,
+              "step_out": 0.13740708351552253,
+              "same_direction": 0.3384346305203323,
+              "passing_tone": 0.01060341058154788,
+              "neighbor_tone": 0.017162221250546568,
+              "resolves_by_step": 0.13740708351552253,
+              "non_chord_resolution": 0.07345867949278531,
+              "short_or_normal_duration": 0.8871884564932225,
+              "downbeat_strength": 0.25021862702229997,
+              "subdivision_strength": 0.2644293834717971
+            }
+          }
+        }
+      },
+      "0.97": {
+        "raw": {
+          "tp": 8400,
+          "fp": 1197,
+          "fn": 8379,
+          "precision": 0.87527352297593,
+          "recall": 0.5006257822277848,
+          "fp_analysis": {
+            "count": 1197,
+            "mean_error_prob": 0.9859154790067235,
+            "mean_keep_prob": 0.00258391948728978,
+            "mean_replace_prob": 0.9332273805513687,
+            "mean_delete_prob": 0.0641886955203442,
+            "feature_rates": {
+              "chord_tone": 0.4678362573099415,
+              "step_in": 0.10526315789473684,
+              "step_out": 0.14035087719298245,
+              "same_direction": 0.3634085213032581,
+              "passing_tone": 0.012531328320802004,
+              "neighbor_tone": 0.009189640768588136,
+              "resolves_by_step": 0.14035087719298245,
+              "non_chord_resolution": 0.08939014202172096,
+              "short_or_normal_duration": 0.8922305764411027,
+              "downbeat_strength": 0.2631578947368421,
+              "subdivision_strength": 0.2573099415204678
+            }
+          },
+          "tp_analysis": {
+            "count": 8400,
+            "mean_error_prob": 0.9944880432245278,
+            "mean_keep_prob": 0.0009507386941151622,
+            "mean_replace_prob": 0.768525996103528,
+            "mean_delete_prob": 0.23052326270435566,
+            "feature_rates": {
+              "chord_tone": 0.5101190476190476,
+              "step_in": 0.13488095238095238,
+              "step_out": 0.13904761904761906,
+              "same_direction": 0.3388095238095238,
+              "passing_tone": 0.01107142857142857,
+              "neighbor_tone": 0.017738095238095237,
+              "resolves_by_step": 0.13904761904761906,
+              "non_chord_resolution": 0.0736904761904762,
+              "short_or_normal_duration": 0.8902380952380953,
+              "downbeat_strength": 0.25,
+              "subdivision_strength": 0.26476190476190475
+            }
+          }
+        },
+        "reported_non_keep": {
+          "tp": 8400,
+          "fp": 1197,
+          "fn": 8379,
+          "precision": 0.87527352297593,
+          "recall": 0.5006257822277848,
+          "fp_analysis": {
+            "count": 1197,
+            "mean_error_prob": 0.9859154790067235,
+            "mean_keep_prob": 0.00258391948728978,
+            "mean_replace_prob": 0.9332273805513687,
+            "mean_delete_prob": 0.0641886955203442,
+            "feature_rates": {
+              "chord_tone": 0.4678362573099415,
+              "step_in": 0.10526315789473684,
+              "step_out": 0.14035087719298245,
+              "same_direction": 0.3634085213032581,
+              "passing_tone": 0.012531328320802004,
+              "neighbor_tone": 0.009189640768588136,
+              "resolves_by_step": 0.14035087719298245,
+              "non_chord_resolution": 0.08939014202172096,
+              "short_or_normal_duration": 0.8922305764411027,
+              "downbeat_strength": 0.2631578947368421,
+              "subdivision_strength": 0.2573099415204678
+            }
+          },
+          "tp_analysis": {
+            "count": 8400,
+            "mean_error_prob": 0.9944880432245278,
+            "mean_keep_prob": 0.0009507386941151622,
+            "mean_replace_prob": 0.768525996103528,
+            "mean_delete_prob": 0.23052326270435566,
+            "feature_rates": {
+              "chord_tone": 0.5101190476190476,
+              "step_in": 0.13488095238095238,
+              "step_out": 0.13904761904761906,
+              "same_direction": 0.3388095238095238,
+              "passing_tone": 0.01107142857142857,
+              "neighbor_tone": 0.017738095238095237,
+              "resolves_by_step": 0.13904761904761906,
+              "non_chord_resolution": 0.0736904761904762,
+              "short_or_normal_duration": 0.8902380952380953,
+              "downbeat_strength": 0.25,
+              "subdivision_strength": 0.26476190476190475
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "label": "melodic_36feat",
+    "checkpoint": "checkpoints\\transformer_melodic_theory_precision.pt",
+    "input_size": 36,
+    "total_clean": 1441141,
+    "total_error": 16779,
+    "thresholds": {
+      "0.95": {
+        "raw": {
+          "tp": 9283,
+          "fp": 1873,
+          "fn": 7496,
+          "precision": 0.8321082825385443,
+          "recall": 0.5532510876691102,
+          "fp_analysis": {
+            "count": 1873,
+            "mean_error_prob": 0.9782630836206264,
+            "mean_keep_prob": 0.003890029353122759,
+            "mean_replace_prob": 0.937489421614304,
+            "mean_delete_prob": 0.05862054806916611,
+            "feature_rates": {
+              "chord_tone": 0.4532835024025627,
+              "step_in": 0.11318739989321944,
+              "step_out": 0.1414842498665243,
+              "same_direction": 0.3742658836091831,
+              "passing_tone": 0.009076348104644954,
+              "neighbor_tone": 0.009076348104644954,
+              "resolves_by_step": 0.1414842498665243,
+              "non_chord_resolution": 0.08862786972770956,
+              "short_or_normal_duration": 0.8868126001067805,
+              "downbeat_strength": 0.2589428723972237,
+              "subdivision_strength": 0.24666310731446878
+            }
+          },
+          "tp_analysis": {
+            "count": 9283,
+            "mean_error_prob": 0.9918029020858148,
+            "mean_keep_prob": 0.001370950896704586,
+            "mean_replace_prob": 0.7834950212092668,
+            "mean_delete_prob": 0.21513402495381886,
+            "feature_rates": {
+              "chord_tone": 0.5030701281913175,
+              "step_in": 0.13454702143703545,
+              "step_out": 0.13777873532263277,
+              "same_direction": 0.3383604438220403,
+              "passing_tone": 0.010449208230098029,
+              "neighbor_tone": 0.01766670257459873,
+              "resolves_by_step": 0.13777873532263277,
+              "non_chord_resolution": 0.07400624798017882,
+              "short_or_normal_duration": 0.8880749757621459,
+              "downbeat_strength": 0.24841107400624798,
+              "subdivision_strength": 0.2638155768609286
+            }
+          }
+        },
+        "reported_non_keep": {
+          "tp": 9283,
+          "fp": 1873,
+          "fn": 7496,
+          "precision": 0.8321082825385443,
+          "recall": 0.5532510876691102,
+          "fp_analysis": {
+            "count": 1873,
+            "mean_error_prob": 0.9782630836206264,
+            "mean_keep_prob": 0.003890029353122759,
+            "mean_replace_prob": 0.937489421614304,
+            "mean_delete_prob": 0.05862054806916611,
+            "feature_rates": {
+              "chord_tone": 0.4532835024025627,
+              "step_in": 0.11318739989321944,
+              "step_out": 0.1414842498665243,
+              "same_direction": 0.3742658836091831,
+              "passing_tone": 0.009076348104644954,
+              "neighbor_tone": 0.009076348104644954,
+              "resolves_by_step": 0.1414842498665243,
+              "non_chord_resolution": 0.08862786972770956,
+              "short_or_normal_duration": 0.8868126001067805,
+              "downbeat_strength": 0.2589428723972237,
+              "subdivision_strength": 0.24666310731446878
+            }
+          },
+          "tp_analysis": {
+            "count": 9283,
+            "mean_error_prob": 0.9918029020858148,
+            "mean_keep_prob": 0.001370950896704586,
+            "mean_replace_prob": 0.7834950212092668,
+            "mean_delete_prob": 0.21513402495381886,
+            "feature_rates": {
+              "chord_tone": 0.5030701281913175,
+              "step_in": 0.13454702143703545,
+              "step_out": 0.13777873532263277,
+              "same_direction": 0.3383604438220403,
+              "passing_tone": 0.010449208230098029,
+              "neighbor_tone": 0.01766670257459873,
+              "resolves_by_step": 0.13777873532263277,
+              "non_chord_resolution": 0.07400624798017882,
+              "short_or_normal_duration": 0.8880749757621459,
+              "downbeat_strength": 0.24841107400624798,
+              "subdivision_strength": 0.2638155768609286
+            }
+          }
+        }
+      },
+      "0.97": {
+        "raw": {
+          "tp": 8560,
+          "fp": 1287,
+          "fn": 8219,
+          "precision": 0.8693002945059409,
+          "recall": 0.5101615114130759,
+          "fp_analysis": {
+            "count": 1287,
+            "mean_error_prob": 0.9863664753324038,
+            "mean_keep_prob": 0.002428132951534686,
+            "mean_replace_prob": 0.9413100476089066,
+            "mean_delete_prob": 0.056261819438377436,
+            "feature_rates": {
+              "chord_tone": 0.4630924630924631,
+              "step_in": 0.11033411033411034,
+              "step_out": 0.1383061383061383,
+              "same_direction": 0.36752136752136755,
+              "passing_tone": 0.009324009324009324,
+              "neighbor_tone": 0.008547008547008548,
+              "resolves_by_step": 0.1383061383061383,
+              "non_chord_resolution": 0.08547008547008547,
+              "short_or_normal_duration": 0.8951048951048951,
+              "downbeat_strength": 0.2634032634032634,
+              "subdivision_strength": 0.2556332556332556
+            }
+          },
+          "tp_analysis": {
+            "count": 8560,
+            "mean_error_prob": 0.994415573894142,
+            "mean_keep_prob": 0.0009237092442001476,
+            "mean_replace_prob": 0.7734860149351445,
+            "mean_delete_prob": 0.22559027360735578,
+            "feature_rates": {
+              "chord_tone": 0.5070093457943925,
+              "step_in": 0.13422897196261682,
+              "step_out": 0.13679906542056075,
+              "same_direction": 0.3399532710280374,
+              "passing_tone": 0.010397196261682243,
+              "neighbor_tone": 0.017873831775700934,
+              "resolves_by_step": 0.13679906542056075,
+              "non_chord_resolution": 0.07336448598130842,
+              "short_or_normal_duration": 0.8899532710280373,
+              "downbeat_strength": 0.2502336448598131,
+              "subdivision_strength": 0.26378504672897196
+            }
+          }
+        },
+        "reported_non_keep": {
+          "tp": 8560,
+          "fp": 1287,
+          "fn": 8219,
+          "precision": 0.8693002945059409,
+          "recall": 0.5101615114130759,
+          "fp_analysis": {
+            "count": 1287,
+            "mean_error_prob": 0.9863664753324038,
+            "mean_keep_prob": 0.002428132951534686,
+            "mean_replace_prob": 0.9413100476089066,
+            "mean_delete_prob": 0.056261819438377436,
+            "feature_rates": {
+              "chord_tone": 0.4630924630924631,
+              "step_in": 0.11033411033411034,
+              "step_out": 0.1383061383061383,
+              "same_direction": 0.36752136752136755,
+              "passing_tone": 0.009324009324009324,
+              "neighbor_tone": 0.008547008547008548,
+              "resolves_by_step": 0.1383061383061383,
+              "non_chord_resolution": 0.08547008547008547,
+              "short_or_normal_duration": 0.8951048951048951,
+              "downbeat_strength": 0.2634032634032634,
+              "subdivision_strength": 0.2556332556332556
+            }
+          },
+          "tp_analysis": {
+            "count": 8560,
+            "mean_error_prob": 0.994415573894142,
+            "mean_keep_prob": 0.0009237092442001476,
+            "mean_replace_prob": 0.7734860149351445,
+            "mean_delete_prob": 0.22559027360735578,
+            "feature_rates": {
+              "chord_tone": 0.5070093457943925,
+              "step_in": 0.13422897196261682,
+              "step_out": 0.13679906542056075,
+              "same_direction": 0.3399532710280374,
+              "passing_tone": 0.010397196261682243,
+              "neighbor_tone": 0.017873831775700934,
+              "resolves_by_step": 0.13679906542056075,
+              "non_chord_resolution": 0.07336448598130842,
+              "short_or_normal_duration": 0.8899532710280373,
+              "downbeat_strength": 0.2502336448598131,
+              "subdivision_strength": 0.26378504672897196
+            }
+          }
+        }
+      }
+    }
+  }
+]
