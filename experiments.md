@@ -535,3 +535,42 @@ Success criteria:
 - maintain precision `>=0.80` at the selected threshold
 - improve precision-constrained recall beyond the previous high-precision recall around `0.56`
 - ideally approach precision `>=0.80` and recall `>=0.65` before considering hard-negative mining
+
+Observed result:
+
+- run stopped at epoch 9/24 by early stopping
+- best checkpoint was saved at epoch 1 by `precision_recall_score`
+- checkpoint: `checkpoints\transformer_coverage_calibrated.pt`
+
+Best saved test metrics:
+
+- `precision_recall_score=0.8334`
+- `precision_constrained_threshold=0.85`
+- `precision_constrained_precision=0.8037`
+- `precision_constrained_recall=0.5751`
+- `precision_constrained_f1=0.6705`
+- `best_det_threshold=0.70`
+- `best_det_precision=0.7222`
+- `best_det_recall=0.6451`
+- `best_det_f1=0.6815`
+- `best_det_f0_5_threshold=0.95`
+- `best_det_f0_5_precision=0.8827`
+- `best_det_f0_5_recall=0.4763`
+- `best_det_f0_5=0.7540`
+- `replace_pitch_top3=0.9007`
+- `replace_kind_acc=0.7808`
+- `task_score=0.7611`
+- `precision_task_score=0.7947`
+
+Comparison:
+
+- previous theory-weighted recall checkpoint: precision `0.7545`, recall `0.6308`, F1 `0.6871`, F0.5 `0.7539`
+- coverage + calibration at precision-constrained threshold: precision improved to `0.8037`, but recall fell to `0.5751`
+- coverage + calibration best F1 threshold: recall `0.6451`, but precision only `0.7222`
+- F0.5 is nearly unchanged: `0.7540` vs previous `0.7539`
+
+Conclusion:
+
+- sparse calibration successfully restored precision above `0.80`
+- it did not recover enough recall; the model still cannot reach precision `>=0.80` and recall `>=0.65` simultaneously
+- the next useful step should be hard-negative/hard-positive mining or a threshold-aware training objective, not another ordinary fine-tune
