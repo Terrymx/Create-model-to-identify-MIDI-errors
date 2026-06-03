@@ -574,3 +574,69 @@ Conclusion:
 - sparse calibration successfully restored precision above `0.80`
 - it did not recover enough recall; the model still cannot reach precision `>=0.80` and recall `>=0.65` simultaneously
 - the next useful step should be hard-negative/hard-positive mining or a threshold-aware training objective, not another ordinary fine-tune
+
+## Run: Hard Pairwise Ranking Fine-Tune
+
+Status: started after coverage + sparse calibration showed that threshold calibration alone does not improve the precision/recall frontier.
+
+Purpose:
+
+- improve score ordering rather than only calibrating the decision threshold
+- push hard true errors above hard clean notes within each batch
+- reduce the overlap between missed true errors and false-positive clean notes
+
+Code changes:
+
+- added hard pairwise ranking loss for detection logits
+- for each batch, the loss compares:
+  - lowest-scoring true errors as hard positives
+  - highest-scoring clean notes as hard negatives
+- new args:
+  - `--ranking-loss-weight`
+  - `--ranking-margin`
+  - `--ranking-top-k`
+
+Planned command:
+
+```powershell
+E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi_error_detector.train `
+  --model transformer `
+  --init-checkpoint checkpoints\transformer_coverage_calibrated.pt `
+  --data-root "E:\downloads\妗岄潰\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 0 `
+  --epochs 18 `
+  --calibration-epochs 6 `
+  --early-stop-patience 6 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rates 0.01 0.02 0.05 `
+  --calibration-error-rates 0.005 0.01 `
+  --error-rate 0.01 `
+  --det-threshold 0.75 `
+  --det-pos-weight 1.4 `
+  --clean-theory-weight 2.0 `
+  --error-theory-weight 1.4 `
+  --ranking-loss-weight 0.25 `
+  --ranking-margin 1.0 `
+  --ranking-top-k 64 `
+  --target-precision 0.8 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 `
+  --save-metric precision_recall_score `
+  --lr 0.00002 `
+  --lr-patience 3 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.001 `
+  --num-workers 0 `
+  --output checkpoints\transformer_hard_ranking.pt
+```
+
+Success criteria:
+
+- beat coverage calibration precision-constrained recall `0.5751` while keeping precision `>=0.80`
+- ideally move toward precision `>=0.80`, recall `>=0.65`
+- avoid dropping F0.5 below the previous range around `0.754`

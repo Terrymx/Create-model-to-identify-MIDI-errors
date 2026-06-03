@@ -48,6 +48,29 @@ def f_beta(precision: float, recall: float, beta: float) -> float:
     return (1.0 + beta_squared) * precision * recall / max(beta_squared * precision + recall, 1e-12)
 
 
+def hard_pairwise_ranking_loss(
+    logits: torch.Tensor,
+    is_error: torch.Tensor,
+    mask: torch.Tensor,
+    margin: float,
+    top_k: int,
+) -> torch.Tensor:
+    """Rank hard positive errors above hard negative clean notes within a batch."""
+
+    valid = mask.bool()
+    positive_logits = logits[(is_error >= 0.5) & valid]
+    negative_logits = logits[(is_error < 0.5) & valid]
+    if positive_logits.numel() == 0 or negative_logits.numel() == 0 or top_k <= 0:
+        return logits.sum() * 0.0
+
+    hard_positive_count = min(top_k, positive_logits.numel())
+    hard_negative_count = min(top_k, negative_logits.numel())
+    hard_positives = torch.topk(positive_logits, k=hard_positive_count, largest=False).values
+    hard_negatives = torch.topk(negative_logits, k=hard_negative_count, largest=True).values
+    pairwise_margin = margin - hard_positives.unsqueeze(1) + hard_negatives.unsqueeze(0)
+    return torch.relu(pairwise_margin).mean()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", required=True, help="Extracted MAESTRO MIDI archive directory")
@@ -118,6 +141,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transformer-ffn-dim", type=int, default=512)
     parser.add_argument("--pitch-loss-weight", type=float, default=0.5)
     parser.add_argument("--kind-loss-weight", type=float, default=0.3)
+    parser.add_argument(
+        "--ranking-loss-weight",
+        type=float,
+        default=0.0,
+        help="Weight for hard pairwise ranking loss between low-scoring errors and high-scoring clean notes.",
+    )
+    parser.add_argument(
+        "--ranking-margin",
+        type=float,
+        default=1.0,
+        help="Required logit margin for ranking true errors above hard clean negatives.",
+    )
+    parser.add_argument(
+        "--ranking-top-k",
+        type=int,
+        default=64,
+        help="Number of hardest positives and negatives per batch used by ranking loss.",
+    )
     parser.add_argument(
         "--det-pos-weight",
         type=float,
@@ -230,12 +271,16 @@ def run_epoch(
     kind_class_weight: torch.Tensor | None,
     threshold_sweep: list[float] | None = None,
     target_precision: float = 0.8,
+    ranking_loss_weight: float = 0.0,
+    ranking_margin: float = 1.0,
+    ranking_top_k: int = 64,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
     totals = {
         "loss": 0.0,
         "det_loss": 0.0,
+        "ranking_loss": 0.0,
         "pitch_loss": 0.0,
         "kind_loss": 0.0,
         "pitch_correct": 0.0,
@@ -279,7 +324,14 @@ def run_epoch(
             pitch_mask = mask * (error_kind != 2).float()
             pitch_loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, pitch_mask)
             kind_loss = masked_kind_loss(outputs["kind_logits"], error_kind, mask, class_weight=kind_class_weight)
-            loss = det_loss + pitch_loss_weight * pitch_loss + kind_loss_weight * kind_loss
+            ranking_loss = hard_pairwise_ranking_loss(
+                outputs["error_logits"],
+                is_error,
+                mask,
+                margin=ranking_margin,
+                top_k=ranking_top_k,
+            )
+            loss = det_loss + pitch_loss_weight * pitch_loss + kind_loss_weight * kind_loss + ranking_loss_weight * ranking_loss
             if training:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -303,6 +355,7 @@ def run_epoch(
 
         totals["loss"] += float(loss.detach()) * float(mask.sum())
         totals["det_loss"] += float(det_loss.detach()) * float(mask.sum())
+        totals["ranking_loss"] += float(ranking_loss.detach()) * float(mask.sum())
         totals["pitch_loss"] += float(pitch_loss.detach()) * float(pitch_mask.sum().clamp_min(1.0))
         totals["kind_loss"] += float(kind_loss.detach()) * float(mask.sum())
         totals["pitch_correct"] += float((pitch_correct & valid_mask & (error_kind != 2)).sum())
@@ -389,6 +442,7 @@ def run_epoch(
     return {
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
+        "ranking_loss": totals["ranking_loss"] / notes,
         "pitch_loss": totals["pitch_loss"] / correction_notes,
         "kind_loss": totals["kind_loss"] / notes,
         "pitch_acc": totals["pitch_correct"] / correction_notes,
@@ -478,7 +532,8 @@ def main() -> None:
     best_valid = float("inf") if args.save_metric == "loss" else -float("inf")
     print(
         f"loss weights: det_pos_weight={args.det_pos_weight}, "
-        f"kind_class_weights={args.kind_class_weights}, save_metric={args.save_metric}",
+        f"kind_class_weights={args.kind_class_weights}, ranking_loss_weight={args.ranking_loss_weight}, "
+        f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, save_metric={args.save_metric}",
         flush=True,
     )
     output = Path(args.output)
@@ -518,6 +573,9 @@ def main() -> None:
             kind_class_weight=kind_class_weight,
             threshold_sweep=None,
             target_precision=args.target_precision,
+            ranking_loss_weight=args.ranking_loss_weight,
+            ranking_margin=args.ranking_margin,
+            ranking_top_k=args.ranking_top_k,
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
 
@@ -553,6 +611,9 @@ def main() -> None:
             kind_class_weight=kind_class_weight,
             threshold_sweep=None,
             target_precision=args.target_precision,
+            ranking_loss_weight=args.ranking_loss_weight,
+            ranking_margin=args.ranking_margin,
+            ranking_top_k=args.ranking_top_k,
         )
         test_loader.dataset.set_epoch(0)
         valid_metrics = run_epoch(
@@ -568,6 +629,9 @@ def main() -> None:
             kind_class_weight=kind_class_weight,
             threshold_sweep=args.threshold_sweep,
             target_precision=args.target_precision,
+            ranking_loss_weight=0.0,
+            ranking_margin=args.ranking_margin,
+            ranking_top_k=args.ranking_top_k,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)
