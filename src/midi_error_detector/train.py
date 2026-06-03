@@ -80,6 +80,19 @@ def parse_args() -> argparse.Namespace:
         help="Optional per-epoch cycle of training corruption rates, useful for sparse-error fine-tuning.",
     )
     parser.add_argument(
+        "--calibration-epochs",
+        type=int,
+        default=0,
+        help="Use sparse calibration error rates for the last N corrupted epochs; 0 disables this phase.",
+    )
+    parser.add_argument(
+        "--calibration-error-rates",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Per-epoch cycle used during the final calibration phase, e.g. 0.005 0.01 0.02.",
+    )
+    parser.add_argument(
         "--det-threshold",
         type=float,
         default=0.3,
@@ -139,15 +152,23 @@ def parse_args() -> argparse.Namespace:
         help="Detection thresholds to evaluate on the held-out split; best_det_* reports the best F1 among them.",
     )
     parser.add_argument(
+        "--target-precision",
+        type=float,
+        default=0.8,
+        help="Precision floor used by precision_recall_score checkpoint selection.",
+    )
+    parser.add_argument(
         "--save-metric",
         default="task_score",
         choices=[
             "task_score",
             "precision_task_score",
+            "precision_recall_score",
             "det_f1",
             "det_f0_5",
             "best_det_f1",
             "best_det_f0_5",
+            "precision_constrained_recall",
             "replace_pitch_top3",
             "loss",
         ],
@@ -208,6 +229,7 @@ def run_epoch(
     det_pos_weight: torch.Tensor | None,
     kind_class_weight: torch.Tensor | None,
     threshold_sweep: list[float] | None = None,
+    target_precision: float = 0.8,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
@@ -322,6 +344,10 @@ def run_epoch(
     best_f0_5_precision = precision
     best_f0_5_recall = recall
     best_threshold_f0_5 = f0_5
+    precision_constrained_threshold = det_threshold
+    precision_constrained_precision = 0.0
+    precision_constrained_recall = 0.0
+    precision_constrained_f1 = 0.0
     for threshold, stats in threshold_stats.items():
         threshold_precision = stats["tp"] / max(stats["tp"] + stats["fp"], 1.0)
         threshold_recall = stats["tp"] / max(stats["tp"] + stats["fn"], 1.0)
@@ -337,11 +363,29 @@ def run_epoch(
             best_f0_5_precision = threshold_precision
             best_f0_5_recall = threshold_recall
             best_threshold_f0_5 = threshold_f0_5
+        if threshold_precision >= target_precision and (
+            threshold_recall > precision_constrained_recall
+            or (
+                threshold_recall == precision_constrained_recall
+                and threshold_f1 > precision_constrained_f1
+            )
+        ):
+            precision_constrained_threshold = threshold
+            precision_constrained_precision = threshold_precision
+            precision_constrained_recall = threshold_recall
+            precision_constrained_f1 = threshold_f1
 
     replace_kind_acc = totals["replace_kind_correct"] / replace_notes
     replace_pitch_top3 = totals["replace_pitch_top3"] / replace_notes
     task_score = 0.50 * best_threshold_f1 + 0.25 * replace_pitch_top3 + 0.25 * replace_kind_acc
     precision_task_score = 0.60 * best_threshold_f0_5 + 0.25 * replace_pitch_top3 + 0.15 * replace_kind_acc
+    precision_shortfall = max(0.0, target_precision - best_f0_5_precision)
+    precision_recall_score = (
+        precision_constrained_recall
+        + 0.20 * replace_pitch_top3
+        + 0.10 * replace_kind_acc
+        - 2.0 * precision_shortfall
+    )
     return {
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
@@ -366,8 +410,13 @@ def run_epoch(
         "best_det_f0_5_precision": best_f0_5_precision,
         "best_det_f0_5_recall": best_f0_5_recall,
         "best_det_f0_5": best_threshold_f0_5,
+        "precision_constrained_threshold": precision_constrained_threshold,
+        "precision_constrained_precision": precision_constrained_precision,
+        "precision_constrained_recall": precision_constrained_recall,
+        "precision_constrained_f1": precision_constrained_f1,
         "task_score": task_score,
         "precision_task_score": precision_task_score,
+        "precision_recall_score": precision_recall_score,
         "error_rate": totals["error_notes"] / notes,
         "replace_rate": totals["replace_notes"] / notes,
         "delete_rate": totals["delete_notes"] / notes,
@@ -468,21 +517,28 @@ def main() -> None:
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
             threshold_sweep=None,
+            target_precision=args.target_precision,
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
 
     train_error_rates = args.train_error_rates or [args.train_error_rate]
+    calibration_error_rates = args.calibration_error_rates or train_error_rates
     train_loader.dataset.error_rate = train_error_rates[0]
     print(
         f"switching train loader to corrupted stage: train_error_rates={train_error_rates}, "
-        f"eval_error_rate={args.error_rate}, det_threshold={args.det_threshold}",
+        f"calibration_epochs={args.calibration_epochs}, calibration_error_rates={calibration_error_rates}, "
+        f"eval_error_rate={args.error_rate}, det_threshold={args.det_threshold}, target_precision={args.target_precision}",
         flush=True,
     )
     epochs_without_improvement = 0
     for epoch in range(1, args.epochs + 1):
-        train_error_rate = train_error_rates[(epoch - 1) % len(train_error_rates)]
+        in_calibration = args.calibration_epochs > 0 and epoch > args.epochs - args.calibration_epochs
+        active_error_rates = calibration_error_rates if in_calibration else train_error_rates
+        active_epoch = epoch - (args.epochs - args.calibration_epochs) if in_calibration else epoch
+        train_error_rate = active_error_rates[(active_epoch - 1) % len(active_error_rates)]
         train_loader.dataset.error_rate = train_error_rate
-        print(f"corrupt epoch={epoch}/{args.epochs} train_error_rate={train_error_rate}", flush=True)
+        phase = "calibration" if in_calibration else "coverage"
+        print(f"corrupt epoch={epoch}/{args.epochs} phase={phase} train_error_rate={train_error_rate}", flush=True)
         train_loader.dataset.set_epoch(args.clean_epochs + epoch)
         train_metrics = run_epoch(
             model,
@@ -496,6 +552,7 @@ def main() -> None:
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
             threshold_sweep=None,
+            target_precision=args.target_precision,
         )
         test_loader.dataset.set_epoch(0)
         valid_metrics = run_epoch(
@@ -510,6 +567,7 @@ def main() -> None:
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
             threshold_sweep=args.threshold_sweep,
+            target_precision=args.target_precision,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)

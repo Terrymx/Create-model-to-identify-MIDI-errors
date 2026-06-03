@@ -454,3 +454,84 @@ Success criteria:
 - first-stage candidate recall should exceed the previous `0.7766` at threshold `0.50`
 - ideally threshold `0.50` candidate recall should cross `0.80`
 - precision can be lower at this stage, but should not collapse so badly that reranking becomes unrealistic
+
+Observed result:
+
+- stopped at epoch 16/24 by early stopping
+- best checkpoint came from epoch 9
+- best test F1 threshold `0.8`: precision `0.7545`, recall `0.6308`, F1 `0.6871`
+- best F0.5 threshold `0.9`: precision `0.8237`, recall `0.5632`, F0.5 `0.7539`
+- recall improved compared with the precision-first baseline, but precision dropped and F0.5 did not beat the previous `0.7620`
+
+Conclusion:
+
+- theory-weighted positive learning helped recover recall
+- the model became too willing to report errors under sparse-error evaluation
+- next step should keep high/mid error-rate coverage for learning error types, but finish with sparse calibration and save checkpoints using precision-constrained recall
+
+## Run: Coverage + Sparse Calibration Fine-Tune
+
+Status: started after theory-weighted recall run stopped at epoch 16.
+
+Purpose:
+
+- keep diverse synthetic errors so the model learns multiple wrong-note types
+- avoid teaching the model that real pieces have dense error priors
+- calibrate the final decision boundary on sparse wrong-note distributions
+- select checkpoints by recall only when precision stays above the target floor
+
+Code changes:
+
+- added a final calibration phase:
+  - `--calibration-epochs`
+  - `--calibration-error-rates`
+- added precision-constrained metrics:
+  - `precision_constrained_threshold`
+  - `precision_constrained_precision`
+  - `precision_constrained_recall`
+  - `precision_constrained_f1`
+  - `precision_recall_score`
+- added `--target-precision`, default `0.8`
+- added `--save-metric precision_recall_score`
+
+Planned command:
+
+```powershell
+E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi_error_detector.train `
+  --model transformer `
+  --init-checkpoint checkpoints\transformer_theory_weighted_recall.pt `
+  --data-root "E:\downloads\妗岄潰\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 0 `
+  --epochs 24 `
+  --calibration-epochs 10 `
+  --early-stop-patience 8 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rates 0.02 0.05 0.08 `
+  --calibration-error-rates 0.005 0.01 0.02 `
+  --error-rate 0.01 `
+  --det-threshold 0.75 `
+  --det-pos-weight 1.6 `
+  --clean-theory-weight 2.2 `
+  --error-theory-weight 1.2 `
+  --target-precision 0.8 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 `
+  --save-metric precision_recall_score `
+  --lr 0.00003 `
+  --lr-patience 3 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.001 `
+  --num-workers 0 `
+  --output checkpoints\transformer_coverage_calibrated.pt
+```
+
+Success criteria:
+
+- maintain precision `>=0.80` at the selected threshold
+- improve precision-constrained recall beyond the previous high-precision recall around `0.56`
+- ideally approach precision `>=0.80` and recall `>=0.65` before considering hard-negative mining
