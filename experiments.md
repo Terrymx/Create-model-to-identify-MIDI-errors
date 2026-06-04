@@ -640,3 +640,42 @@ Success criteria:
 - beat coverage calibration precision-constrained recall `0.5751` while keeping precision `>=0.80`
 - ideally move toward precision `>=0.80`, recall `>=0.65`
 - avoid dropping F0.5 below the previous range around `0.754`
+
+Observed result:
+
+- run stopped at epoch 15/18 by early stopping
+- best checkpoint was saved at epoch 9 by `precision_recall_score`
+- checkpoint: `checkpoints\transformer_hard_ranking.pt`
+
+Best saved test metrics:
+
+- `precision_recall_score=0.8169`
+- `precision_constrained_threshold=0.70`
+- `precision_constrained_precision=0.8063`
+- `precision_constrained_recall=0.5548`
+- `precision_constrained_f1=0.6573`
+- `best_det_threshold=0.60`
+- `best_det_precision=0.7621`
+- `best_det_recall=0.5973`
+- `best_det_f1=0.6697`
+- `best_det_f0_5_threshold=0.80`
+- `best_det_f0_5_precision=0.8521`
+- `best_det_f0_5_recall=0.5056`
+- `best_det_f0_5=0.7494`
+- `replace_pitch_top3=0.9028`
+- `replace_kind_acc=0.8162`
+- `task_score=0.7646`
+- `precision_task_score=0.7978`
+- `ranking_loss=0.5757`
+
+Comparison:
+
+- coverage + calibration checkpoint: precision-constrained precision `0.8037`, recall `0.5751`, F1 `0.6705`, F0.5 `0.7540`
+- hard ranking checkpoint: precision-constrained precision `0.8063`, recall `0.5548`, F1 `0.6573`, F0.5 `0.7494`
+- ranking loss improved `replace_kind_acc` and kept high precision, but did not improve recall at the precision floor
+
+Conclusion:
+
+- the simple in-batch hard ranking loss was too conservative for sparse wrong-note recall
+- it likely pushed both hard positives and hard negatives apart in a way that preserved precision but did not raise enough missed true errors above threshold
+- next step should inspect false negatives/false positives directly and build a mined evaluation/training set, instead of relying on batch-local ranking alone
