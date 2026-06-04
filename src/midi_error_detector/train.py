@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Iterator
 
 import torch
 from torch.utils.data import DataLoader
@@ -69,6 +70,66 @@ def hard_pairwise_ranking_loss(
     hard_negatives = torch.topk(negative_logits, k=hard_negative_count, largest=True).values
     pairwise_margin = margin - hard_positives.unsqueeze(1) + hard_negatives.unsqueeze(0)
     return torch.relu(pairwise_margin).mean()
+
+
+def append_hard_replay_samples(
+    replay_buffer: list[dict[str, torch.Tensor | float]],
+    batch: dict[str, torch.Tensor],
+    logits: torch.Tensor,
+    max_size: int,
+) -> None:
+    """Keep the hardest windows from the current epoch for next-epoch replay."""
+
+    if max_size <= 0:
+        return
+    with torch.no_grad():
+        mask = batch["mask"].to(logits.device)
+        is_error = batch["is_error"].to(logits.device)
+        probabilities = torch.sigmoid(logits.detach())
+        valid = mask.bool()
+        error_mask = (is_error >= 0.5) & valid
+        clean_mask = (is_error < 0.5) & valid
+
+        error_counts = error_mask.float().sum(dim=1)
+        clean_counts = clean_mask.float().sum(dim=1)
+        false_negative_pressure = ((1.0 - probabilities) * error_mask.float()).sum(dim=1) / error_counts.clamp_min(1.0)
+        false_positive_pressure = (probabilities * clean_mask.float()).amax(dim=1)
+        has_signal = (error_counts > 0) | (clean_counts > 0)
+        hard_scores = false_negative_pressure + 0.5 * false_positive_pressure
+        hard_scores = torch.where(has_signal, hard_scores, torch.zeros_like(hard_scores))
+
+        for item_idx, score in enumerate(hard_scores.detach().cpu().tolist()):
+            if score <= 0.0:
+                continue
+            replay_buffer.append(
+                {
+                    "score": float(score),
+                    "features": batch["features"][item_idx].detach().cpu().clone(),
+                    "is_error": batch["is_error"][item_idx].detach().cpu().clone(),
+                    "target_pitch": batch["target_pitch"][item_idx].detach().cpu().clone(),
+                    "error_kind": batch["error_kind"][item_idx].detach().cpu().clone(),
+                    "det_weight": batch["det_weight"][item_idx].detach().cpu().clone(),
+                    "mask": batch["mask"][item_idx].detach().cpu().clone(),
+                }
+            )
+        if len(replay_buffer) > max_size * 2:
+            replay_buffer.sort(key=lambda sample: float(sample["score"]), reverse=True)
+            del replay_buffer[max_size:]
+
+
+def make_replay_batches(
+    replay_buffer: list[dict[str, torch.Tensor | float]],
+    batch_size: int,
+) -> Iterator[dict[str, torch.Tensor]]:
+    """Yield mini-batches from the previous epoch's hardest windows."""
+
+    tensor_keys = ["features", "is_error", "target_pitch", "error_kind", "det_weight", "mask"]
+    for start in range(0, len(replay_buffer), batch_size):
+        samples = replay_buffer[start : start + batch_size]
+        yield {
+            key: torch.stack([sample[key] for sample in samples if isinstance(sample[key], torch.Tensor)])
+            for key in tensor_keys
+        }
 
 
 def parse_args() -> argparse.Namespace:
@@ -158,6 +219,18 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=64,
         help="Number of hardest positives and negatives per batch used by ranking loss.",
+    )
+    parser.add_argument(
+        "--hard-replay-size",
+        type=int,
+        default=0,
+        help="Keep this many hardest windows from each training epoch and replay them before the next epoch.",
+    )
+    parser.add_argument(
+        "--hard-replay-epochs",
+        type=int,
+        default=1,
+        help="Number of replay passes over the previous epoch's hard window buffer.",
     )
     parser.add_argument(
         "--det-pos-weight",
@@ -274,6 +347,8 @@ def run_epoch(
     ranking_loss_weight: float = 0.0,
     ranking_margin: float = 1.0,
     ranking_top_k: int = 64,
+    hard_replay_buffer: list[dict[str, torch.Tensor | float]] | None = None,
+    hard_replay_size: int = 0,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
@@ -337,6 +412,13 @@ def run_epoch(
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
+                if hard_replay_buffer is not None:
+                    append_hard_replay_samples(
+                        hard_replay_buffer,
+                        batch,
+                        outputs["error_logits"],
+                        max_size=hard_replay_size,
+                    )
 
         valid_mask = mask.bool()
         error_targets = is_error.bool() & valid_mask
@@ -533,7 +615,9 @@ def main() -> None:
     print(
         f"loss weights: det_pos_weight={args.det_pos_weight}, "
         f"kind_class_weights={args.kind_class_weights}, ranking_loss_weight={args.ranking_loss_weight}, "
-        f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, save_metric={args.save_metric}",
+        f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
+        f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
+        f"save_metric={args.save_metric}",
         flush=True,
     )
     output = Path(args.output)
@@ -589,6 +673,7 @@ def main() -> None:
         flush=True,
     )
     epochs_without_improvement = 0
+    previous_hard_replay: list[dict[str, torch.Tensor | float]] = []
     for epoch in range(1, args.epochs + 1):
         in_calibration = args.calibration_epochs > 0 and epoch > args.epochs - args.calibration_epochs
         active_error_rates = calibration_error_rates if in_calibration else train_error_rates
@@ -597,7 +682,34 @@ def main() -> None:
         train_loader.dataset.error_rate = train_error_rate
         phase = "calibration" if in_calibration else "coverage"
         print(f"corrupt epoch={epoch}/{args.epochs} phase={phase} train_error_rate={train_error_rate}", flush=True)
+        if previous_hard_replay and args.hard_replay_epochs > 0:
+            previous_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
+            replay_batches = list(make_replay_batches(previous_hard_replay, args.batch_size))
+            for replay_epoch in range(1, args.hard_replay_epochs + 1):
+                replay_metrics = run_epoch(
+                    model,
+                    replay_batches,
+                    optimizer,
+                    device,
+                    args.pitch_loss_weight,
+                    args.kind_loss_weight,
+                    desc=f"hard replay {epoch}/{args.epochs}.{replay_epoch}",
+                    det_threshold=args.det_threshold,
+                    det_pos_weight=det_pos_weight,
+                    kind_class_weight=kind_class_weight,
+                    threshold_sweep=None,
+                    target_precision=args.target_precision,
+                    ranking_loss_weight=args.ranking_loss_weight,
+                    ranking_margin=args.ranking_margin,
+                    ranking_top_k=args.ranking_top_k,
+                )
+                print(
+                    f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
+                    f"{args.hard_replay_epochs} samples={len(previous_hard_replay)} train={replay_metrics}",
+                    flush=True,
+                )
         train_loader.dataset.set_epoch(args.clean_epochs + epoch)
+        current_hard_replay: list[dict[str, torch.Tensor | float]] = []
         train_metrics = run_epoch(
             model,
             train_loader,
@@ -614,7 +726,13 @@ def main() -> None:
             ranking_loss_weight=args.ranking_loss_weight,
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
+            hard_replay_buffer=current_hard_replay if args.hard_replay_size > 0 else None,
+            hard_replay_size=args.hard_replay_size,
         )
+        current_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
+        previous_hard_replay = current_hard_replay[: args.hard_replay_size]
+        if args.hard_replay_size > 0:
+            print(f"collected hard replay windows={len(previous_hard_replay)} for next epoch", flush=True)
         test_loader.dataset.set_epoch(0)
         valid_metrics = run_epoch(
             model,

@@ -680,7 +680,7 @@ Conclusion:
 - it likely pushed both hard positives and hard negatives apart in a way that preserved precision but did not raise enough missed true errors above threshold
 - next step should inspect false negatives/false positives directly and build a mined evaluation/training set, instead of relying on batch-local ranking alone
 
-## Run: From-Scratch Transformer with Coverage, Calibration, and Online Hard Ranking
+## Run: From-Scratch Transformer with Coverage, Calibration, and Epoch Hard Replay
 
 Status: started after repeated fine-tuning failed to improve the precision/recall frontier.
 
@@ -698,6 +698,10 @@ Training strategy:
 - online hard ranking in every training epoch:
   - hard positives: low-scoring true errors in each batch
   - hard negatives: high-scoring clean notes in each batch
+- epoch-to-epoch hard replay:
+  - each training epoch stores the hardest windows by false-negative and false-positive pressure
+  - before the next epoch, the model replays those stored windows once
+  - this gives the next epoch direct access to the previous epoch's hard positives and hard negatives
 
 Planned command:
 
@@ -725,6 +729,8 @@ E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m m
   --ranking-loss-weight 0.12 `
   --ranking-margin 0.75 `
   --ranking-top-k 64 `
+  --hard-replay-size 768 `
+  --hard-replay-epochs 1 `
   --target-precision 0.8 `
   --kind-class-weights 1 6 4 `
   --threshold-sweep 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 `
@@ -734,11 +740,11 @@ E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m m
   --lr-factor 0.5 `
   --lr-threshold 0.001 `
   --num-workers 0 `
-  --output checkpoints\transformer_from_scratch_hard_curriculum.pt
+  --output checkpoints\transformer_from_scratch_hard_replay.pt
 ```
 
 Success criteria:
 
 - beat the best fine-tuned precision-constrained recall `0.5751` at precision `>=0.80`
 - preferably recover recall near `0.65` without precision falling below `0.80`
-- if it still fails, the bottleneck is likely synthetic data design / missing real hard-case mining rather than checkpoint initialization
+- if it still fails, the bottleneck is likely synthetic data design / missing offline hard-case mining rather than checkpoint initialization
