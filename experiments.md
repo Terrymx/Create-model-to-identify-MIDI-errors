@@ -679,3 +679,66 @@ Conclusion:
 - the simple in-batch hard ranking loss was too conservative for sparse wrong-note recall
 - it likely pushed both hard positives and hard negatives apart in a way that preserved precision but did not raise enough missed true errors above threshold
 - next step should inspect false negatives/false positives directly and build a mined evaluation/training set, instead of relying on batch-local ranking alone
+
+## Run: From-Scratch Transformer with Coverage, Calibration, and Online Hard Ranking
+
+Status: started after repeated fine-tuning failed to improve the precision/recall frontier.
+
+Reasoning:
+
+- previous runs may be limited by the checkpoint's learned error prior and score ordering
+- further fine-tuning can preserve an early bias instead of relearning the task
+- starting from scratch lets the model learn with the corrected training curriculum from the beginning
+
+Training strategy:
+
+- clean warm-up for basic MIDI reconstruction and keep/replace/delete heads
+- coverage phase with mixed error rates to learn diverse synthetic error types
+- sparse calibration phase to match realistic low-error evaluation
+- online hard ranking in every training epoch:
+  - hard positives: low-scoring true errors in each batch
+  - hard negatives: high-scoring clean notes in each batch
+
+Planned command:
+
+```powershell
+E:\downloads\妗岄潰\dku\CS309\project\code\venv\Scripts\python.exe -B -u -m midi_error_detector.train `
+  --model transformer `
+  --data-root "E:\downloads\妗岄潰\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0" `
+  --clean-epochs 1 `
+  --epochs 36 `
+  --calibration-epochs 10 `
+  --early-stop-patience 10 `
+  --batch-size 8 `
+  --window-size 256 `
+  --num-layers 4 `
+  --transformer-d-model 192 `
+  --transformer-heads 4 `
+  --transformer-ffn-dim 512 `
+  --train-error-rates 0.01 0.02 0.05 0.08 `
+  --calibration-error-rates 0.005 0.01 0.02 `
+  --error-rate 0.01 `
+  --det-threshold 0.75 `
+  --det-pos-weight 1.8 `
+  --clean-theory-weight 2.0 `
+  --error-theory-weight 1.5 `
+  --ranking-loss-weight 0.12 `
+  --ranking-margin 0.75 `
+  --ranking-top-k 64 `
+  --target-precision 0.8 `
+  --kind-class-weights 1 6 4 `
+  --threshold-sweep 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 `
+  --save-metric precision_recall_score `
+  --lr 0.0003 `
+  --lr-patience 4 `
+  --lr-factor 0.5 `
+  --lr-threshold 0.001 `
+  --num-workers 0 `
+  --output checkpoints\transformer_from_scratch_hard_curriculum.pt
+```
+
+Success criteria:
+
+- beat the best fine-tuned precision-constrained recall `0.5751` at precision `>=0.80`
+- preferably recover recall near `0.65` without precision falling below `0.80`
+- if it still fails, the bottleneck is likely synthetic data design / missing real hard-case mining rather than checkpoint initialization
