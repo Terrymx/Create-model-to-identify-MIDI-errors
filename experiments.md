@@ -829,3 +829,39 @@ Success criteria:
 - primary: improve precision-constrained recall above `0.5751` while keeping precision `>=0.80`
 - secondary: improve best F1/F0.5 frontier over `transformer_coverage_calibrated.pt`
 - diagnostic: `masked_pitch_loss` should steadily fall during `stage=clean_mask`; if it does not, the masking task is too hard or leaking the wrong signal
+
+## 2026-06-05 - Curriculum + asymmetric hard replay
+
+Motivation:
+
+- The interrupted `masked_context_detector` run showed the same early pattern: recall rises on high-error corrupt epochs, but replay remains too conservative.
+- The next experiment keeps model architecture, losses, features, optimizer, masked pitch settings, and eval protocol fixed.
+- Only the training scheduler and hard replay composition change, so the effect is easier to attribute.
+
+Code changes:
+
+- Added `--curriculum-error-rate-stages`, parsed as semicolon-separated stages.
+- Added `--asymmetric-hard-replay`.
+- Added FN/FP replay buckets:
+  - `--fn-replay-fraction`
+  - `--fn-replay-weight`
+  - `--fp-replay-weight`
+- Smoke-tested on `--max-files 2`; stages switched as expected and replay reported `fn_candidates` / `fp_candidates`.
+
+Planned run:
+
+```powershell
+cd E:\downloads\桌面\dku\CS309\project\code_new
+
+$out='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\curriculum_asym_replay.log'
+$err='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\curriculum_asym_replay.err.log'
+$cmd="`$env:PYTHONPATH='src'; `$env:PYTHONDONTWRITEBYTECODE='1'; & 'E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe' -B -u -m midi_error_detector.train --model transformer --data-root 'E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0' --clean-epochs 0 --epochs 36 --early-stop-patience 10 --batch-size 8 --window-size 256 --num-layers 4 --transformer-d-model 192 --transformer-heads 4 --transformer-ffn-dim 512 --curriculum-error-rate-stages '0.08,0.12;0.02,0.05,0.08;0.005,0.01,0.02' --error-rate 0.01 --det-threshold 0.70 --det-pos-weight 2.3 --clean-theory-weight 1.5 --error-theory-weight 1.5 --masked-pitch-loss-weight 0.35 --masked-pitch-rate 0.18 --clean-mask-batches-per-epoch 900 --ranking-loss-weight 0.06 --ranking-margin 0.65 --ranking-top-k 64 --hard-replay-size 512 --hard-replay-epochs 1 --asymmetric-hard-replay --fn-replay-fraction 0.75 --fn-replay-weight 1.5 --fp-replay-weight 0.4 --target-precision 0.8 --kind-class-weights 1 6 4 --threshold-sweep 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 --save-metric precision_recall_score --lr 0.0003 --lr-patience 4 --lr-factor 0.5 --lr-threshold 0.001 --num-workers 0 --output checkpoints\transformer_curriculum_asym_replay.pt"
+$p=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',$cmd) -WorkingDirectory 'E:\downloads\桌面\dku\CS309\project\code_new' -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden -PassThru
+$p | Select-Object Id,ProcessName,StartTime
+```
+
+Success criteria:
+
+- primary: beat `recall=0.5751` at precision `>=0.80`
+- if `0.45 <= recall < 0.58`, increase FN replay pressure or start the sparse curriculum stage earlier
+- if recall remains `<0.40`, move to loss/calibration redesign rather than more scheduler tuning

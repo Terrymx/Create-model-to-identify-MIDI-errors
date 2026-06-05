@@ -127,6 +127,60 @@ def masked_pitch_reconstruction_loss(
     return loss, float(sampled.sum())
 
 
+def parse_error_rate_stages(raw_stages: str | None) -> list[list[float]] | None:
+    """Parse semicolon-separated curriculum stages, e.g. '0.08,0.12;0.02,0.05;0.005,0.01'."""
+
+    if raw_stages is None:
+        return None
+    stages: list[list[float]] = []
+    for raw_stage in raw_stages.split(";"):
+        raw_stage = raw_stage.strip()
+        if not raw_stage:
+            continue
+        rates = [float(value.strip()) for value in raw_stage.split(",") if value.strip()]
+        if not rates:
+            raise ValueError(f"Empty curriculum stage in {raw_stages!r}")
+        stages.append(rates)
+    if not stages:
+        raise ValueError("--curriculum-error-rate-stages must contain at least one stage")
+    return stages
+
+
+def select_curriculum_error_rates(
+    stages: list[list[float]] | None,
+    default_rates: list[float],
+    epoch: int,
+    total_epochs: int,
+) -> tuple[str, list[float], int]:
+    """Return the active curriculum stage name, rates, and 1-based epoch within that stage."""
+
+    if not stages:
+        return "coverage", default_rates, epoch
+    stage_count = len(stages)
+    stage_idx = min((epoch - 1) * stage_count // max(total_epochs, 1), stage_count - 1)
+    stage_start = (stage_idx * total_epochs) // stage_count + 1
+    return f"curriculum_{stage_idx + 1}", stages[stage_idx], epoch - stage_start + 1
+
+
+def _clone_replay_sample(
+    batch: dict[str, torch.Tensor],
+    item_idx: int,
+    score: float,
+    replay_weight: float,
+    replay_kind: str,
+) -> dict[str, torch.Tensor | float | str]:
+    return {
+        "score": float(score),
+        "replay_kind": replay_kind,
+        "features": batch["features"][item_idx].detach().cpu().clone(),
+        "is_error": batch["is_error"][item_idx].detach().cpu().clone(),
+        "target_pitch": batch["target_pitch"][item_idx].detach().cpu().clone(),
+        "error_kind": batch["error_kind"][item_idx].detach().cpu().clone(),
+        "det_weight": batch["det_weight"][item_idx].detach().cpu().clone() * float(replay_weight),
+        "mask": batch["mask"][item_idx].detach().cpu().clone(),
+    }
+
+
 def append_hard_replay_samples(
     replay_buffer: list[dict[str, torch.Tensor | float]],
     batch: dict[str, torch.Tensor],
@@ -172,8 +226,76 @@ def append_hard_replay_samples(
             del replay_buffer[max_size:]
 
 
+def append_asymmetric_hard_replay_samples(
+    fn_replay_buffer: list[dict[str, torch.Tensor | float | str]],
+    fp_replay_buffer: list[dict[str, torch.Tensor | float | str]],
+    batch: dict[str, torch.Tensor],
+    logits: torch.Tensor,
+    max_size: int,
+    fn_fraction: float,
+    fn_weight: float,
+    fp_weight: float,
+    det_threshold: float,
+) -> None:
+    """Keep separate false-negative and false-positive replay windows."""
+
+    if max_size <= 0:
+        return
+    fn_limit = max(1, int(round(max_size * fn_fraction)))
+    fp_limit = max(1, max_size - fn_limit)
+    with torch.no_grad():
+        mask = batch["mask"].to(logits.device)
+        is_error = batch["is_error"].to(logits.device)
+        probabilities = torch.sigmoid(logits.detach())
+        valid = mask.bool()
+        error_mask = (is_error >= 0.5) & valid
+        clean_mask = (is_error < 0.5) & valid
+
+        fn_counts = (error_mask & (probabilities < det_threshold)).float().sum(dim=1)
+        error_counts = error_mask.float().sum(dim=1)
+        false_negative_pressure = ((det_threshold - probabilities).clamp_min(0.0) * error_mask.float()).sum(dim=1)
+        false_negative_pressure = false_negative_pressure / error_counts.clamp_min(1.0)
+
+        fp_pressure_per_note = (probabilities - det_threshold).clamp_min(0.0) * clean_mask.float()
+        false_positive_pressure = fp_pressure_per_note.amax(dim=1)
+        fp_counts = (clean_mask & (probabilities >= det_threshold)).float().sum(dim=1)
+
+        for item_idx, score in enumerate(false_negative_pressure.detach().cpu().tolist()):
+            if score <= 0.0 or float(fn_counts[item_idx].detach().cpu()) <= 0.0:
+                continue
+            fn_replay_buffer.append(_clone_replay_sample(batch, item_idx, score, fn_weight, "fn"))
+        for item_idx, score in enumerate(false_positive_pressure.detach().cpu().tolist()):
+            if score <= 0.0 or float(fp_counts[item_idx].detach().cpu()) <= 0.0:
+                continue
+            fp_replay_buffer.append(_clone_replay_sample(batch, item_idx, score, fp_weight, "fp"))
+
+        if len(fn_replay_buffer) > fn_limit * 2:
+            fn_replay_buffer.sort(key=lambda sample: float(sample["score"]), reverse=True)
+            del fn_replay_buffer[fn_limit:]
+        if len(fp_replay_buffer) > fp_limit * 2:
+            fp_replay_buffer.sort(key=lambda sample: float(sample["score"]), reverse=True)
+            del fp_replay_buffer[fp_limit:]
+
+
+def select_asymmetric_replay_samples(
+    fn_replay_buffer: list[dict[str, torch.Tensor | float | str]],
+    fp_replay_buffer: list[dict[str, torch.Tensor | float | str]],
+    max_size: int,
+    fn_fraction: float,
+) -> list[dict[str, torch.Tensor | float | str]]:
+    if max_size <= 0:
+        return []
+    fn_limit = max(1, int(round(max_size * fn_fraction)))
+    fp_limit = max(1, max_size - fn_limit)
+    fn_replay_buffer.sort(key=lambda sample: float(sample["score"]), reverse=True)
+    fp_replay_buffer.sort(key=lambda sample: float(sample["score"]), reverse=True)
+    selected = fn_replay_buffer[:fn_limit] + fp_replay_buffer[:fp_limit]
+    selected.sort(key=lambda sample: float(sample["score"]), reverse=True)
+    return selected[:max_size]
+
+
 def make_replay_batches(
-    replay_buffer: list[dict[str, torch.Tensor | float]],
+    replay_buffer: list[dict[str, torch.Tensor | float | str]],
     batch_size: int,
 ) -> Iterator[dict[str, torch.Tensor]]:
     """Yield mini-batches from the previous epoch's hardest windows."""
@@ -230,6 +352,15 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=None,
         help="Per-epoch cycle used during the final calibration phase, e.g. 0.005 0.01 0.02.",
+    )
+    parser.add_argument(
+        "--curriculum-error-rate-stages",
+        default=None,
+        help=(
+            "Semicolon-separated per-stage error-rate cycles, e.g. "
+            "'0.08,0.12;0.02,0.05,0.08;0.005,0.01,0.02'. "
+            "When set, it overrides train/calibration error-rate scheduling."
+        ),
     )
     parser.add_argument(
         "--det-threshold",
@@ -310,6 +441,29 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         help="Number of replay passes over the previous epoch's hard window buffer.",
+    )
+    parser.add_argument(
+        "--asymmetric-hard-replay",
+        action="store_true",
+        help="Split hard replay into false-negative and false-positive buckets instead of one mixed buffer.",
+    )
+    parser.add_argument(
+        "--fn-replay-fraction",
+        type=float,
+        default=0.75,
+        help="Fraction of hard replay windows reserved for false negatives when asymmetric replay is enabled.",
+    )
+    parser.add_argument(
+        "--fn-replay-weight",
+        type=float,
+        default=1.5,
+        help="Detection-loss multiplier applied to false-negative replay windows.",
+    )
+    parser.add_argument(
+        "--fp-replay-weight",
+        type=float,
+        default=0.4,
+        help="Detection-loss multiplier applied to false-positive replay windows.",
     )
     parser.add_argument(
         "--det-pos-weight",
@@ -427,8 +581,13 @@ def run_epoch(
     ranking_loss_weight: float = 0.0,
     ranking_margin: float = 1.0,
     ranking_top_k: int = 64,
-    hard_replay_buffer: list[dict[str, torch.Tensor | float]] | None = None,
+    hard_replay_buffer: list[dict[str, torch.Tensor | float | str]] | None = None,
     hard_replay_size: int = 0,
+    fn_replay_buffer: list[dict[str, torch.Tensor | float | str]] | None = None,
+    fp_replay_buffer: list[dict[str, torch.Tensor | float | str]] | None = None,
+    fn_replay_fraction: float = 0.75,
+    fn_replay_weight: float = 1.5,
+    fp_replay_weight: float = 0.4,
     masked_pitch_loss_weight: float = 0.0,
     masked_pitch_rate: float = 0.15,
     max_batches: int | None = None,
@@ -517,7 +676,19 @@ def run_epoch(
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
-                if hard_replay_buffer is not None:
+                if fn_replay_buffer is not None and fp_replay_buffer is not None:
+                    append_asymmetric_hard_replay_samples(
+                        fn_replay_buffer,
+                        fp_replay_buffer,
+                        batch,
+                        outputs["error_logits"],
+                        max_size=hard_replay_size,
+                        fn_fraction=fn_replay_fraction,
+                        fn_weight=fn_replay_weight,
+                        fp_weight=fp_replay_weight,
+                        det_threshold=det_threshold,
+                    )
+                elif hard_replay_buffer is not None:
                     append_hard_replay_samples(
                         hard_replay_buffer,
                         batch,
@@ -670,6 +841,9 @@ def run_epoch(
 
 def main() -> None:
     args = parse_args()
+    curriculum_error_rate_stages = parse_error_rate_stages(args.curriculum_error_rate_stages)
+    if not 0.0 <= args.fn_replay_fraction <= 1.0:
+        raise ValueError("--fn-replay-fraction must be between 0 and 1")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"using device={device}", flush=True)
     initial_train_error_rate = 0.0 if args.clean_epochs > 0 else args.train_error_rate
@@ -728,6 +902,8 @@ def main() -> None:
         f"clean_mask_batches_per_epoch={args.clean_mask_batches_per_epoch}, ranking_loss_weight={args.ranking_loss_weight}, "
         f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
         f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
+        f"asymmetric_hard_replay={args.asymmetric_hard_replay}, fn_replay_fraction={args.fn_replay_fraction}, "
+        f"fn_replay_weight={args.fn_replay_weight}, fp_replay_weight={args.fp_replay_weight}, "
         f"save_metric={args.save_metric}",
         flush=True,
     )
@@ -779,23 +955,37 @@ def main() -> None:
 
     train_error_rates = args.train_error_rates or [args.train_error_rate]
     calibration_error_rates = args.calibration_error_rates or train_error_rates
-    train_loader.dataset.error_rate = train_error_rates[0]
+    first_phase_rates = curriculum_error_rate_stages[0] if curriculum_error_rate_stages else train_error_rates
+    train_loader.dataset.error_rate = first_phase_rates[0]
     print(
         f"switching train loader to corrupted stage: train_error_rates={train_error_rates}, "
         f"calibration_epochs={args.calibration_epochs}, calibration_error_rates={calibration_error_rates}, "
+        f"curriculum_error_rate_stages={curriculum_error_rate_stages}, "
         f"eval_error_rate={args.error_rate}, det_threshold={args.det_threshold}, target_precision={args.target_precision}",
         flush=True,
     )
     epochs_without_improvement = 0
-    previous_hard_replay: list[dict[str, torch.Tensor | float]] = []
+    previous_hard_replay: list[dict[str, torch.Tensor | float | str]] = []
     for epoch in range(1, args.epochs + 1):
-        in_calibration = args.calibration_epochs > 0 and epoch > args.epochs - args.calibration_epochs
-        active_error_rates = calibration_error_rates if in_calibration else train_error_rates
-        active_epoch = epoch - (args.epochs - args.calibration_epochs) if in_calibration else epoch
+        if curriculum_error_rate_stages:
+            phase, active_error_rates, active_epoch = select_curriculum_error_rates(
+                curriculum_error_rate_stages,
+                train_error_rates,
+                epoch,
+                args.epochs,
+            )
+        else:
+            in_calibration = args.calibration_epochs > 0 and epoch > args.epochs - args.calibration_epochs
+            active_error_rates = calibration_error_rates if in_calibration else train_error_rates
+            active_epoch = epoch - (args.epochs - args.calibration_epochs) if in_calibration else epoch
+            phase = "calibration" if in_calibration else "coverage"
         train_error_rate = active_error_rates[(active_epoch - 1) % len(active_error_rates)]
         train_loader.dataset.error_rate = train_error_rate
-        phase = "calibration" if in_calibration else "coverage"
-        print(f"corrupt epoch={epoch}/{args.epochs} phase={phase} train_error_rate={train_error_rate}", flush=True)
+        print(
+            f"corrupt epoch={epoch}/{args.epochs} phase={phase} active_rates={active_error_rates} "
+            f"train_error_rate={train_error_rate}",
+            flush=True,
+        )
         if args.clean_mask_batches_per_epoch > 0 and args.masked_pitch_loss_weight > 0.0:
             train_loader.dataset.error_rate = 0.0
             train_loader.dataset.set_epoch(args.clean_epochs + args.epochs + epoch)
@@ -855,7 +1045,9 @@ def main() -> None:
                     flush=True,
                 )
         train_loader.dataset.set_epoch(args.clean_epochs + epoch)
-        current_hard_replay: list[dict[str, torch.Tensor | float]] = []
+        current_hard_replay: list[dict[str, torch.Tensor | float | str]] = []
+        current_fn_replay: list[dict[str, torch.Tensor | float | str]] = []
+        current_fp_replay: list[dict[str, torch.Tensor | float | str]] = []
         train_metrics = run_epoch(
             model,
             train_loader,
@@ -873,14 +1065,41 @@ def main() -> None:
             ranking_loss_weight=args.ranking_loss_weight,
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
-            hard_replay_buffer=current_hard_replay if args.hard_replay_size > 0 else None,
+            hard_replay_buffer=current_hard_replay
+            if args.hard_replay_size > 0 and not args.asymmetric_hard_replay
+            else None,
             hard_replay_size=args.hard_replay_size,
+            fn_replay_buffer=current_fn_replay
+            if args.hard_replay_size > 0 and args.asymmetric_hard_replay
+            else None,
+            fp_replay_buffer=current_fp_replay
+            if args.hard_replay_size > 0 and args.asymmetric_hard_replay
+            else None,
+            fn_replay_fraction=args.fn_replay_fraction,
+            fn_replay_weight=args.fn_replay_weight,
+            fp_replay_weight=args.fp_replay_weight,
             masked_pitch_loss_weight=0.0,
         )
-        current_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
-        previous_hard_replay = current_hard_replay[: args.hard_replay_size]
+        if args.asymmetric_hard_replay:
+            previous_hard_replay = select_asymmetric_replay_samples(
+                current_fn_replay,
+                current_fp_replay,
+                args.hard_replay_size,
+                args.fn_replay_fraction,
+            )
+        else:
+            current_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
+            previous_hard_replay = current_hard_replay[: args.hard_replay_size]
         if args.hard_replay_size > 0:
-            print(f"collected hard replay windows={len(previous_hard_replay)} for next epoch", flush=True)
+            if args.asymmetric_hard_replay:
+                print(
+                    f"collected hard replay windows={len(previous_hard_replay)} "
+                    f"fn_candidates={len(current_fn_replay)} fp_candidates={len(current_fp_replay)} "
+                    f"for next epoch",
+                    flush=True,
+                )
+            else:
+                print(f"collected hard replay windows={len(previous_hard_replay)} for next epoch", flush=True)
         test_loader.dataset.set_epoch(0)
         valid_metrics = run_epoch(
             model,

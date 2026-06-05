@@ -218,6 +218,34 @@ Status:
 - currently running
 - expected to show whether starting from scratch changes the precision/recall frontier
 
+### B9: Masked Context + Curriculum + Asymmetric Replay
+
+Purpose: test whether recall collapse is mainly caused by an overly conservative training prior.
+
+Design:
+
+- keep the current Transformer, note features, detection/pitch/kind heads, masked pitch auxiliary objective, optimizer, scheduler, and eval protocol unchanged
+- change only the training schedule and replay composition
+- use a three-stage corruption curriculum:
+  - early stage: `0.08, 0.12`, to expose diverse error types
+  - middle stage: `0.02, 0.05, 0.08`, to bridge coverage and sparse deployment
+  - late stage: `0.005, 0.01, 0.02`, to calibrate to the realistic sparse-error prior
+- split hard replay into false-negative and false-positive buckets:
+  - FN windows: `75%` of replay capacity, detection weight `1.5`
+  - FP windows: `25%` of replay capacity, detection weight `0.4`
+
+Hypothesis:
+
+- previous hard replay was dominated by "do not report this" pressure, making the detector over-conservative
+- curriculum keeps early error diversity while aligning the final prior with `eval_error_rate=0.01`
+- FN-heavy replay should improve `recall @ precision >= 0.80`
+
+Decision rule:
+
+- if `recall @ P>=0.80 > 0.58`, proceed to an architecture method that exposes masked-context surprise to the detector head
+- if recall lands in `0.45-0.58`, tune curriculum timing and FN replay weight
+- if recall remains `<0.40`, move to loss/calibration redesign
+
 ## Proposed Main Method Candidate
 
 The most paper-worthy next method is not another pure detector. It should combine:
