@@ -748,3 +748,47 @@ Success criteria:
 - beat the best fine-tuned precision-constrained recall `0.5751` at precision `>=0.80`
 - preferably recover recall near `0.65` without precision falling below `0.80`
 - if it still fails, the bottleneck is likely synthetic data design / missing offline hard-case mining rather than checkpoint initialization
+
+Observed result:
+
+- completed all 36 corrupt epochs
+- best checkpoint was saved at epoch 33 by `precision_recall_score`
+- checkpoint: `checkpoints\transformer_from_scratch_hard_replay.pt`
+
+Best saved test metrics:
+
+- `precision_recall_score=0.5238`
+- `precision_constrained_threshold=0.50`
+- `precision_constrained_precision=0.8217`
+- `precision_constrained_recall=0.3226`
+- `precision_constrained_f1=0.4633`
+- `best_det_threshold=0.50`
+- `best_det_precision=0.8217`
+- `best_det_recall=0.3226`
+- `best_det_f1=0.4633`
+- `best_det_f0_5_threshold=0.50`
+- `best_det_f0_5_precision=0.8217`
+- `best_det_f0_5_recall=0.3226`
+- `best_det_f0_5=0.6276`
+- `replace_pitch_top1=0.2390`
+- `replace_pitch_top3=0.7435`
+- `replace_kind_acc=0.5244`
+- `delete_kind_acc=0.7172`
+- `task_score=0.5487`
+- `precision_task_score=0.6411`
+- `ranking_loss=0.6307`
+
+Comparison:
+
+- best previous fine-tuned precision-constrained recall: `0.5751` at precision `0.8037`
+- from-scratch hard replay precision-constrained recall: `0.3226` at precision `0.8217`
+- best previous F0.5 range: around `0.754`
+- from-scratch hard replay F0.5: `0.6276`
+
+Conclusion:
+
+- from-scratch training did not solve the recall bottleneck
+- epoch hard replay made the detector much too conservative for sparse-error recall
+- the clean warm-up plus low-error calibration appears to teach a strong "mostly clean" prior before the model learns robust wrong-note recall
+- this rules out checkpoint initialization as the main bottleneck; the larger issue is the training target/data design
+- next step should not be more replay/fine-tuning; it should be a direct error-analysis/mining pipeline that identifies which error types and musical contexts are missed, then changes synthetic corruption and loss around those concrete failures
