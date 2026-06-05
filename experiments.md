@@ -792,3 +792,40 @@ Conclusion:
 - the clean warm-up plus low-error calibration appears to teach a strong "mostly clean" prior before the model learns robust wrong-note recall
 - this rules out checkpoint initialization as the main bottleneck; the larger issue is the training target/data design
 - next step should not be more replay/fine-tuning; it should be a direct error-analysis/mining pipeline that identifies which error types and musical contexts are missed, then changes synthetic corruption and loss around those concrete failures
+
+## 2026-06-05 - Interleaved clean masked modeling
+
+Motivation:
+
+- The previous from-scratch hard replay run did not improve sparse-error recall.
+- Pure clean warm-up teaches a clean prior, but it does not force the model to infer what a missing/uncertain note should be from context.
+- The next training design should use different data for different objectives:
+  - clean MIDI: learn symbolic music plausibility by masking pitch-derived and theory-derived features, then reconstructing the correct pitch
+  - corrupted MIDI: keep explicit wrong-note detection as the main task
+  - hard replay: keep boundary cases, but avoid letting replay dominate the detector into an overly conservative regime
+
+Code changes:
+
+- Added masked pitch reconstruction inside `train.py`.
+- Added `--masked-pitch-loss-weight` and `--masked-pitch-rate`.
+- Added `--clean-mask-batches-per-epoch` so every corrupt epoch can start with a small clean masked-learning phase.
+- Added `--det-loss-weight` to allow clean masked auxiliary passes to disable detection BCE and train only the contextual pitch objective.
+- Smoke-tested with `--max-files 2`; the new `stage=clean_mask` path runs and reports `masked_pitch_loss`.
+
+Planned run:
+
+```powershell
+cd E:\downloads\桌面\dku\CS309\project\code_new
+
+$out='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\masked_context_detector.log'
+$err='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\masked_context_detector.err.log'
+$cmd="$env:PYTHONPATH='src'; $env:PYTHONDONTWRITEBYTECODE='1'; & 'E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe' -B -u -m midi_error_detector.train --model transformer --data-root 'E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0' --clean-epochs 0 --epochs 36 --calibration-epochs 8 --early-stop-patience 10 --batch-size 8 --window-size 256 --num-layers 4 --transformer-d-model 192 --transformer-heads 4 --transformer-ffn-dim 512 --train-error-rates 0.02 0.05 0.08 0.12 --calibration-error-rates 0.005 0.01 0.02 --error-rate 0.01 --det-threshold 0.70 --det-pos-weight 2.3 --clean-theory-weight 1.5 --error-theory-weight 1.5 --masked-pitch-loss-weight 0.35 --masked-pitch-rate 0.18 --clean-mask-batches-per-epoch 900 --ranking-loss-weight 0.06 --ranking-margin 0.65 --ranking-top-k 64 --hard-replay-size 512 --hard-replay-epochs 1 --target-precision 0.8 --kind-class-weights 1 6 4 --threshold-sweep 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 --save-metric precision_recall_score --lr 0.0003 --lr-patience 4 --lr-factor 0.5 --lr-threshold 0.001 --num-workers 0 --output checkpoints\transformer_masked_context_detector.pt"
+$p=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',$cmd) -WorkingDirectory 'E:\downloads\桌面\dku\CS309\project\code_new' -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden -PassThru
+$p | Select-Object Id,ProcessName,StartTime
+```
+
+Success criteria:
+
+- primary: improve precision-constrained recall above `0.5751` while keeping precision `>=0.80`
+- secondary: improve best F1/F0.5 frontier over `transformer_coverage_calibrated.pt`
+- diagnostic: `masked_pitch_loss` should steadily fall during `stage=clean_mask`; if it does not, the masking task is too hard or leaking the wrong signal

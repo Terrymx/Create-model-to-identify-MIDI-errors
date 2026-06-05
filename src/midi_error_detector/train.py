@@ -13,6 +13,33 @@ from tqdm import tqdm
 from .data import FEATURE_SIZE, MaestroWrongNoteDataset
 from .model import build_wrong_note_model, masked_bce_with_logits, masked_kind_loss, masked_pitch_loss
 
+PITCH_CONTEXT_FEATURE_COLUMNS = [
+    0,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+]
+
 
 def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[str, torch.Tensor]) -> tuple[list[str], list[str], list[str]]:
     """Load matching checkpoint weights and partially copy widened input projections."""
@@ -70,6 +97,34 @@ def hard_pairwise_ranking_loss(
     hard_negatives = torch.topk(negative_logits, k=hard_negative_count, largest=True).values
     pairwise_margin = margin - hard_positives.unsqueeze(1) + hard_negatives.unsqueeze(0)
     return torch.relu(pairwise_margin).mean()
+
+
+def masked_pitch_reconstruction_loss(
+    model: torch.nn.Module,
+    features: torch.Tensor,
+    target_pitch: torch.Tensor,
+    mask: torch.Tensor,
+    mask_rate: float,
+    feature_columns: list[int],
+) -> tuple[torch.Tensor, float]:
+    """Hide pitch-derived features on sampled notes and predict their clean pitch."""
+
+    if mask_rate <= 0.0:
+        return features.sum() * 0.0, 0.0
+    valid = mask.bool()
+    sampled = (torch.rand(mask.shape, device=features.device) < mask_rate) & valid
+    if sampled.sum() == 0:
+        return features.sum() * 0.0, 0.0
+
+    masked_features = features.clone()
+    masked_features[:, :, feature_columns] = torch.where(
+        sampled.unsqueeze(-1),
+        torch.zeros_like(masked_features[:, :, feature_columns]),
+        masked_features[:, :, feature_columns],
+    )
+    outputs = model(masked_features)
+    loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, sampled.float())
+    return loss, float(sampled.sum())
 
 
 def append_hard_replay_samples(
@@ -202,6 +257,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transformer-ffn-dim", type=int, default=512)
     parser.add_argument("--pitch-loss-weight", type=float, default=0.5)
     parser.add_argument("--kind-loss-weight", type=float, default=0.3)
+    parser.add_argument(
+        "--det-loss-weight",
+        type=float,
+        default=1.0,
+        help="Global multiplier for detection BCE; clean masked auxiliary passes can set this to 0.",
+    )
+    parser.add_argument(
+        "--masked-pitch-loss-weight",
+        type=float,
+        default=0.0,
+        help="Weight for masked pitch reconstruction from clean/contextual MIDI features.",
+    )
+    parser.add_argument(
+        "--masked-pitch-rate",
+        type=float,
+        default=0.15,
+        help="Fraction of valid notes whose pitch-derived feature columns are hidden for masked reconstruction.",
+    )
+    parser.add_argument(
+        "--clean-mask-batches-per-epoch",
+        type=int,
+        default=0,
+        help="Run this many clean masked-learning batches before each corrupted epoch; 0 disables the interleaved phase.",
+    )
     parser.add_argument(
         "--ranking-loss-weight",
         type=float,
@@ -336,6 +415,7 @@ def run_epoch(
     loader: DataLoader,
     optimizer: torch.optim.Optimizer | None,
     device: torch.device,
+    det_loss_weight: float,
     pitch_loss_weight: float,
     kind_loss_weight: float,
     desc: str,
@@ -349,6 +429,9 @@ def run_epoch(
     ranking_top_k: int = 64,
     hard_replay_buffer: list[dict[str, torch.Tensor | float]] | None = None,
     hard_replay_size: int = 0,
+    masked_pitch_loss_weight: float = 0.0,
+    masked_pitch_rate: float = 0.15,
+    max_batches: int | None = None,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
@@ -356,6 +439,8 @@ def run_epoch(
         "loss": 0.0,
         "det_loss": 0.0,
         "ranking_loss": 0.0,
+        "masked_pitch_loss": 0.0,
+        "masked_pitch_notes": 0.0,
         "pitch_loss": 0.0,
         "kind_loss": 0.0,
         "pitch_correct": 0.0,
@@ -379,7 +464,9 @@ def run_epoch(
         sweep_thresholds.sort()
     threshold_stats = {threshold: {"tp": 0.0, "fp": 0.0, "fn": 0.0} for threshold in sweep_thresholds}
 
-    for batch in tqdm(loader, desc=desc, unit="batch", dynamic_ncols=True, leave=True):
+    for batch_idx, batch in enumerate(tqdm(loader, desc=desc, unit="batch", dynamic_ncols=True, leave=True), start=1):
+        if max_batches is not None and batch_idx > max_batches:
+            break
         features = batch["features"].to(device)
         is_error = batch["is_error"].to(device)
         target_pitch = batch["target_pitch"].to(device)
@@ -406,7 +493,25 @@ def run_epoch(
                 margin=ranking_margin,
                 top_k=ranking_top_k,
             )
-            loss = det_loss + pitch_loss_weight * pitch_loss + kind_loss_weight * kind_loss + ranking_loss_weight * ranking_loss
+            if masked_pitch_loss_weight > 0.0:
+                masked_recon_loss, masked_pitch_notes = masked_pitch_reconstruction_loss(
+                    model,
+                    features,
+                    target_pitch,
+                    mask,
+                    mask_rate=masked_pitch_rate,
+                    feature_columns=PITCH_CONTEXT_FEATURE_COLUMNS,
+                )
+            else:
+                masked_recon_loss = features.sum() * 0.0
+                masked_pitch_notes = 0.0
+            loss = (
+                det_loss_weight * det_loss
+                + pitch_loss_weight * pitch_loss
+                + kind_loss_weight * kind_loss
+                + ranking_loss_weight * ranking_loss
+                + masked_pitch_loss_weight * masked_recon_loss
+            )
             if training:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -438,6 +543,8 @@ def run_epoch(
         totals["loss"] += float(loss.detach()) * float(mask.sum())
         totals["det_loss"] += float(det_loss.detach()) * float(mask.sum())
         totals["ranking_loss"] += float(ranking_loss.detach()) * float(mask.sum())
+        totals["masked_pitch_loss"] += float(masked_recon_loss.detach()) * max(masked_pitch_notes, 1.0)
+        totals["masked_pitch_notes"] += masked_pitch_notes
         totals["pitch_loss"] += float(pitch_loss.detach()) * float(pitch_mask.sum().clamp_min(1.0))
         totals["kind_loss"] += float(kind_loss.detach()) * float(mask.sum())
         totals["pitch_correct"] += float((pitch_correct & valid_mask & (error_kind != 2)).sum())
@@ -525,6 +632,7 @@ def run_epoch(
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
         "ranking_loss": totals["ranking_loss"] / notes,
+        "masked_pitch_loss": totals["masked_pitch_loss"] / max(totals["masked_pitch_notes"], 1.0),
         "pitch_loss": totals["pitch_loss"] / correction_notes,
         "kind_loss": totals["kind_loss"] / notes,
         "pitch_acc": totals["pitch_correct"] / correction_notes,
@@ -614,7 +722,10 @@ def main() -> None:
     best_valid = float("inf") if args.save_metric == "loss" else -float("inf")
     print(
         f"loss weights: det_pos_weight={args.det_pos_weight}, "
-        f"kind_class_weights={args.kind_class_weights}, ranking_loss_weight={args.ranking_loss_weight}, "
+        f"det_loss_weight={args.det_loss_weight}, pitch_loss_weight={args.pitch_loss_weight}, "
+        f"kind_loss_weight={args.kind_loss_weight}, kind_class_weights={args.kind_class_weights}, "
+        f"masked_pitch_loss_weight={args.masked_pitch_loss_weight}, masked_pitch_rate={args.masked_pitch_rate}, "
+        f"clean_mask_batches_per_epoch={args.clean_mask_batches_per_epoch}, ranking_loss_weight={args.ranking_loss_weight}, "
         f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
         f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
         f"save_metric={args.save_metric}",
@@ -649,6 +760,7 @@ def main() -> None:
             train_loader,
             optimizer,
             device,
+            args.det_loss_weight,
             args.pitch_loss_weight,
             args.kind_loss_weight,
             desc=f"clean {epoch}/{args.clean_epochs}",
@@ -660,6 +772,8 @@ def main() -> None:
             ranking_loss_weight=args.ranking_loss_weight,
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
+            masked_pitch_loss_weight=args.masked_pitch_loss_weight,
+            masked_pitch_rate=args.masked_pitch_rate,
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
 
@@ -682,6 +796,36 @@ def main() -> None:
         train_loader.dataset.error_rate = train_error_rate
         phase = "calibration" if in_calibration else "coverage"
         print(f"corrupt epoch={epoch}/{args.epochs} phase={phase} train_error_rate={train_error_rate}", flush=True)
+        if args.clean_mask_batches_per_epoch > 0 and args.masked_pitch_loss_weight > 0.0:
+            train_loader.dataset.error_rate = 0.0
+            train_loader.dataset.set_epoch(args.clean_epochs + args.epochs + epoch)
+            clean_mask_metrics = run_epoch(
+                model,
+                train_loader,
+                optimizer,
+                device,
+                0.0,
+                0.0,
+                0.0,
+                desc=f"clean mask {epoch}/{args.epochs}",
+                det_threshold=args.det_threshold,
+                det_pos_weight=None,
+                kind_class_weight=kind_class_weight,
+                threshold_sweep=None,
+                target_precision=args.target_precision,
+                ranking_loss_weight=0.0,
+                ranking_margin=args.ranking_margin,
+                ranking_top_k=args.ranking_top_k,
+                masked_pitch_loss_weight=args.masked_pitch_loss_weight,
+                masked_pitch_rate=args.masked_pitch_rate,
+                max_batches=args.clean_mask_batches_per_epoch,
+            )
+            print(
+                f"stage=clean_mask epoch={epoch}/{args.epochs} batches={args.clean_mask_batches_per_epoch} "
+                f"train={clean_mask_metrics}",
+                flush=True,
+            )
+            train_loader.dataset.error_rate = train_error_rate
         if previous_hard_replay and args.hard_replay_epochs > 0:
             previous_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
             replay_batches = list(make_replay_batches(previous_hard_replay, args.batch_size))
@@ -691,6 +835,7 @@ def main() -> None:
                     replay_batches,
                     optimizer,
                     device,
+                    args.det_loss_weight,
                     args.pitch_loss_weight,
                     args.kind_loss_weight,
                     desc=f"hard replay {epoch}/{args.epochs}.{replay_epoch}",
@@ -702,6 +847,7 @@ def main() -> None:
                     ranking_loss_weight=args.ranking_loss_weight,
                     ranking_margin=args.ranking_margin,
                     ranking_top_k=args.ranking_top_k,
+                    masked_pitch_loss_weight=0.0,
                 )
                 print(
                     f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
@@ -715,6 +861,7 @@ def main() -> None:
             train_loader,
             optimizer,
             device,
+            args.det_loss_weight,
             args.pitch_loss_weight,
             args.kind_loss_weight,
             desc=f"corrupt train {epoch}/{args.epochs}",
@@ -728,6 +875,7 @@ def main() -> None:
             ranking_top_k=args.ranking_top_k,
             hard_replay_buffer=current_hard_replay if args.hard_replay_size > 0 else None,
             hard_replay_size=args.hard_replay_size,
+            masked_pitch_loss_weight=0.0,
         )
         current_hard_replay.sort(key=lambda sample: float(sample["score"]), reverse=True)
         previous_hard_replay = current_hard_replay[: args.hard_replay_size]
@@ -739,6 +887,7 @@ def main() -> None:
             test_loader,
             None,
             device,
+            args.det_loss_weight,
             args.pitch_loss_weight,
             args.kind_loss_weight,
             desc=f"corrupt {args.eval_split} {epoch}/{args.epochs}",
@@ -750,6 +899,7 @@ def main() -> None:
             ranking_loss_weight=0.0,
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
+            masked_pitch_loss_weight=0.0,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)
