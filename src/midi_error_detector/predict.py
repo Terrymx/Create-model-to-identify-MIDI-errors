@@ -11,6 +11,7 @@ import torch
 from .data import extract_note_events, note_features
 from .harmony import harmony_scores_for_pitches
 from .model import build_wrong_note_model
+from .train import build_explicit_surprise
 
 ACTION_NAMES = ["keep", "replace", "delete"]
 
@@ -180,6 +181,8 @@ def main() -> None:
         transformer_heads=int(train_args.get("transformer_heads", 4)),
         transformer_ffn_dim=int(train_args.get("transformer_ffn_dim", 512)),
         dropout=float(train_args.get("dropout", 0.2)),
+        explicit_surprise=bool(train_args.get("explicit_surprise", False)),
+        surprise_embedding_dim=int(train_args.get("surprise_embedding_dim", 16)),
     ).to(device)
     model.load_state_dict(state_dict)
     model.eval()
@@ -202,7 +205,19 @@ def main() -> None:
             elif features.shape[-1] < input_size:
                 features = torch.nn.functional.pad(features, (0, input_size - features.shape[-1]))
 
-            outputs = model(features)
+            if bool(train_args.get("explicit_surprise", False)):
+                feature_mask = torch.ones(features.shape[:2], dtype=features.dtype, device=device)
+                surprise, surprise_available = build_explicit_surprise(
+                    model,
+                    features,
+                    feature_mask,
+                    training=False,
+                    train_mask_rate=float(train_args.get("surprise_train_mask_rate", 0.25)),
+                    eval_groups=int(train_args.get("surprise_eval_groups", 4)),
+                )
+                outputs = model(features, surprise=surprise, surprise_available=surprise_available)
+            else:
+                outputs = model(features)
             window_probabilities = torch.sigmoid(outputs["error_logits"])[0].cpu()
             window_action_probabilities = torch.softmax(outputs["kind_logits"], dim=-1)[0].cpu()
             top_k = min(output_top_k, outputs["pitch_logits"].shape[-1])

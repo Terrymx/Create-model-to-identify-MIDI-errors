@@ -865,3 +865,88 @@ Success criteria:
 - primary: beat `recall=0.5751` at precision `>=0.80`
 - if `0.45 <= recall < 0.58`, increase FN replay pressure or start the sparse curriculum stage earlier
 - if recall remains `<0.40`, move to loss/calibration redesign rather than more scheduler tuning
+
+Observed result:
+
+- completed all 36 epochs without errors
+- best checkpoint was saved at epoch 35 by `precision_recall_score`
+- checkpoint: `checkpoints\transformer_curriculum_asym_replay.pt`
+
+Best saved test metrics:
+
+- `precision_recall_score=0.6500`
+- `precision_constrained_threshold=0.75`
+- `precision_constrained_precision=0.8092`
+- `precision_constrained_recall=0.4256`
+- `precision_constrained_f1=0.5578`
+- `best_det_threshold=0.45`
+- `best_det_precision=0.6909`
+- `best_det_recall=0.5421`
+- `best_det_f1=0.6075`
+- `best_det_f0_5_threshold=0.80`
+- `best_det_f0_5_precision=0.8301`
+- `best_det_f0_5_recall=0.4043`
+- `best_det_f0_5=0.6857`
+- `replace_pitch_top1=0.3290`
+- `replace_pitch_top3=0.8014`
+- `replace_kind_acc=0.6413`
+- `delete_kind_acc=0.8077`
+
+Comparison:
+
+- previous from-scratch hard replay: precision `0.8217`, recall `0.3226`
+- curriculum + asymmetric replay: precision `0.8092`, recall `0.4256`
+- recall improved by `0.1030` while precision remained above `0.80`
+- historical target baseline remains precision `0.8037`, recall `0.5751`
+
+Conclusion:
+
+- the conservative-training diagnosis was partly correct
+- curriculum and FN-heavy replay recovered a meaningful amount of recall
+- the experiment did not beat the historical recall baseline, so scheduler changes alone are insufficient
+- based on the predefined decision rule, the next iteration should strengthen FN replay and begin the sparse curriculum stage earlier before moving to architecture or loss redesign
+
+## 2026-06-06 - Step 2 explicit masked-context surprise
+
+Motivation:
+
+- Step 1A improved recall from `0.3226` to `0.4256` at precision above `0.80`, confirming that scheduling and replay composition matter.
+- It still did not beat the historical recall baseline `0.5751`.
+- The masked pitch head may learn contextual plausibility without giving the error head direct access to that information.
+
+Architecture change:
+
+- compute `surprise = -log P(observed_pitch | masked context)`
+- embed normalized surprise plus a surprise-availability flag
+- concatenate this embedding to the normal Transformer hidden state before the error head
+- retain the existing pitch and kind heads
+
+Leakage protection:
+
+- mask the target note's pitch-derived and theory-derived feature columns
+- globally remove interval/melodic columns that can reveal the target pitch through neighboring notes
+- use random target masking during training (`0.25`)
+- use four grouped masked passes during evaluation so every valid note receives a surprise value
+
+Initialization:
+
+- load `checkpoints\transformer_curriculum_asym_replay.pt`
+- copy the existing 192 detector hidden weights into the widened error head
+- initialize only the new surprise projection and surprise-specific detector columns
+
+Planned run:
+
+```powershell
+cd E:\downloads\桌面\dku\CS309\project\code_new
+
+$out='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\explicit_surprise_step2.log'
+$err='E:\downloads\桌面\dku\CS309\project\code_new\training_logs\explicit_surprise_step2.err.log'
+$cmd="`$env:PYTHONPATH='src'; `$env:PYTHONDONTWRITEBYTECODE='1'; & 'E:\downloads\桌面\dku\CS309\project\code\venv\Scripts\python.exe' -B -u -m midi_error_detector.train --model transformer --init-checkpoint checkpoints\transformer_curriculum_asym_replay.pt --explicit-surprise --surprise-train-mask-rate 0.25 --surprise-eval-groups 4 --surprise-embedding-dim 16 --data-root 'E:\downloads\桌面\dku\CS309\project\maestro-v3.0.0-midi\maestro-v3.0.0' --clean-epochs 0 --epochs 36 --early-stop-patience 10 --batch-size 8 --window-size 256 --num-layers 4 --transformer-d-model 192 --transformer-heads 4 --transformer-ffn-dim 512 --curriculum-error-rate-stages '0.08,0.12;0.02,0.05,0.08;0.005,0.01,0.02' --error-rate 0.01 --det-threshold 0.70 --det-pos-weight 2.3 --clean-theory-weight 1.5 --error-theory-weight 1.5 --masked-pitch-loss-weight 0.35 --masked-pitch-rate 0.18 --clean-mask-batches-per-epoch 900 --ranking-loss-weight 0.06 --ranking-margin 0.65 --ranking-top-k 64 --hard-replay-size 512 --hard-replay-epochs 1 --asymmetric-hard-replay --fn-replay-fraction 0.75 --fn-replay-weight 1.5 --fp-replay-weight 0.4 --target-precision 0.8 --kind-class-weights 1 6 4 --threshold-sweep 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.93 0.95 --save-metric precision_recall_score --lr 0.0003 --lr-patience 4 --lr-factor 0.5 --lr-threshold 0.001 --num-workers 0 --output checkpoints\transformer_explicit_surprise_step2.pt"
+$p=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',$cmd) -WorkingDirectory 'E:\downloads\桌面\dku\CS309\project\code_new' -RedirectStandardOutput $out -RedirectStandardError $err -WindowStyle Hidden -PassThru
+```
+
+Success criteria:
+
+- primary: `recall > 0.5751` at precision `>=0.80`
+- diagnostic: mean error surprise should exceed mean clean surprise
+- compare the full PR frontier, not only the selected threshold

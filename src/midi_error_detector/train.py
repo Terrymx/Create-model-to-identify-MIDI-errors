@@ -39,6 +39,7 @@ PITCH_CONTEXT_FEATURE_COLUMNS = [
     31,
     32,
 ]
+PITCH_LEAKAGE_FEATURE_COLUMNS = [4, 15, 24, 25, 26, 27, 28, 29, 30, 31, 32]
 
 
 def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[str, torch.Tensor]) -> tuple[list[str], list[str], list[str]]:
@@ -59,6 +60,14 @@ def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[st
             loaded.append(name)
             continue
         if name == "input_projection.weight" and model_value.ndim == 2 and checkpoint_value.ndim == 2:
+            copied = model_value.clone()
+            rows = min(model_value.shape[0], checkpoint_value.shape[0])
+            cols = min(model_value.shape[1], checkpoint_value.shape[1])
+            copied[:rows, :cols] = checkpoint_value[:rows, :cols]
+            adapted_state[name] = copied
+            partial.append(f"{name} old={tuple(checkpoint_value.shape)} new={tuple(model_value.shape)} copied_cols={cols}")
+            continue
+        if name == "error_head.weight" and model_value.ndim == 2 and checkpoint_value.ndim == 2:
             copied = model_value.clone()
             rows = min(model_value.shape[0], checkpoint_value.shape[0])
             cols = min(model_value.shape[1], checkpoint_value.shape[1])
@@ -122,9 +131,55 @@ def masked_pitch_reconstruction_loss(
         torch.zeros_like(masked_features[:, :, feature_columns]),
         masked_features[:, :, feature_columns],
     )
-    outputs = model(masked_features)
-    loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, sampled.float())
+    pitch_logits = model.predict_pitch(masked_features)
+    loss = masked_pitch_loss(pitch_logits, target_pitch, sampled.float())
     return loss, float(sampled.sum())
+
+
+def build_explicit_surprise(
+    model: torch.nn.Module,
+    features: torch.Tensor,
+    mask: torch.Tensor,
+    training: bool,
+    train_mask_rate: float,
+    eval_groups: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Estimate observed-pitch surprise without exposing the target note's pitch-derived features."""
+
+    valid = mask.bool()
+    observed_pitch = torch.round(features[:, :, 0] * 127.0).long().clamp(0, 127)
+    surprise = torch.zeros_like(mask)
+    available = torch.zeros_like(mask, dtype=torch.bool)
+
+    if training:
+        selected_masks = [(torch.rand(mask.shape, device=features.device) < train_mask_rate) & valid]
+        if selected_masks[0].sum() == 0 and valid.any():
+            first_valid = valid.float().argmax(dim=1)
+            selected_masks[0][torch.arange(valid.shape[0], device=features.device), first_valid] = True
+    else:
+        group_count = max(1, eval_groups)
+        positions = torch.arange(features.shape[1], device=features.device).unsqueeze(0)
+        selected_masks = [valid & ((positions % group_count) == group_idx) for group_idx in range(group_count)]
+
+    for selected in selected_masks:
+        if selected.sum() == 0:
+            continue
+        context_features = features.clone()
+        context_features[:, :, PITCH_LEAKAGE_FEATURE_COLUMNS] = 0.0
+        context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS] = torch.where(
+            selected.unsqueeze(-1),
+            torch.zeros_like(context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS]),
+            context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS],
+        )
+        pitch_logits = model.predict_pitch(context_features)
+        observed_log_probability = torch.log_softmax(pitch_logits, dim=-1).gather(
+            dim=-1,
+            index=observed_pitch.unsqueeze(-1),
+        ).squeeze(-1)
+        selected_surprise = -observed_log_probability
+        surprise = torch.where(selected, selected_surprise, surprise)
+        available |= selected
+    return surprise, available.float()
 
 
 def parse_error_rate_stages(raw_stages: str | None) -> list[list[float]] | None:
@@ -413,6 +468,29 @@ def parse_args() -> argparse.Namespace:
         help="Run this many clean masked-learning batches before each corrupted epoch; 0 disables the interleaved phase.",
     )
     parser.add_argument(
+        "--explicit-surprise",
+        action="store_true",
+        help="Feed masked-context observed-pitch surprise explicitly into the detection head.",
+    )
+    parser.add_argument(
+        "--surprise-train-mask-rate",
+        type=float,
+        default=0.25,
+        help="Fraction of notes receiving leakage-safe surprise values per training batch.",
+    )
+    parser.add_argument(
+        "--surprise-eval-groups",
+        type=int,
+        default=4,
+        help="Number of grouped masked-context passes used to compute surprise for every note during evaluation.",
+    )
+    parser.add_argument(
+        "--surprise-embedding-dim",
+        type=int,
+        default=16,
+        help="Size of the surprise/availability embedding concatenated to detector hidden states.",
+    )
+    parser.add_argument(
         "--ranking-loss-weight",
         type=float,
         default=0.0,
@@ -590,6 +668,9 @@ def run_epoch(
     fp_replay_weight: float = 0.4,
     masked_pitch_loss_weight: float = 0.0,
     masked_pitch_rate: float = 0.15,
+    explicit_surprise: bool = False,
+    surprise_train_mask_rate: float = 0.25,
+    surprise_eval_groups: int = 4,
     max_batches: int | None = None,
 ) -> dict[str, float]:
     training = optimizer is not None
@@ -600,6 +681,10 @@ def run_epoch(
         "ranking_loss": 0.0,
         "masked_pitch_loss": 0.0,
         "masked_pitch_notes": 0.0,
+        "surprise_clean_sum": 0.0,
+        "surprise_error_sum": 0.0,
+        "surprise_clean_notes": 0.0,
+        "surprise_error_notes": 0.0,
         "pitch_loss": 0.0,
         "kind_loss": 0.0,
         "pitch_correct": 0.0,
@@ -634,7 +719,20 @@ def run_epoch(
         mask = batch["mask"].to(device)
 
         with torch.set_grad_enabled(training):
-            outputs = model(features)
+            if explicit_surprise:
+                surprise, surprise_available = build_explicit_surprise(
+                    model,
+                    features,
+                    mask,
+                    training=training,
+                    train_mask_rate=surprise_train_mask_rate,
+                    eval_groups=surprise_eval_groups,
+                )
+                outputs = model(features, surprise=surprise, surprise_available=surprise_available)
+            else:
+                surprise = torch.zeros_like(mask)
+                surprise_available = torch.zeros_like(mask)
+                outputs = model(features)
             det_loss = masked_bce_with_logits(
                 outputs["error_logits"],
                 is_error,
@@ -716,6 +814,11 @@ def run_epoch(
         totals["ranking_loss"] += float(ranking_loss.detach()) * float(mask.sum())
         totals["masked_pitch_loss"] += float(masked_recon_loss.detach()) * max(masked_pitch_notes, 1.0)
         totals["masked_pitch_notes"] += masked_pitch_notes
+        available_mask = surprise_available.bool() & valid_mask
+        totals["surprise_clean_sum"] += float((surprise.detach() * (available_mask & clean_targets).float()).sum())
+        totals["surprise_error_sum"] += float((surprise.detach() * (available_mask & error_targets).float()).sum())
+        totals["surprise_clean_notes"] += float((available_mask & clean_targets).sum())
+        totals["surprise_error_notes"] += float((available_mask & error_targets).sum())
         totals["pitch_loss"] += float(pitch_loss.detach()) * float(pitch_mask.sum().clamp_min(1.0))
         totals["kind_loss"] += float(kind_loss.detach()) * float(mask.sum())
         totals["pitch_correct"] += float((pitch_correct & valid_mask & (error_kind != 2)).sum())
@@ -761,11 +864,16 @@ def run_epoch(
     precision_constrained_precision = 0.0
     precision_constrained_recall = 0.0
     precision_constrained_f1 = 0.0
+    sweep_metrics: dict[str, float] = {}
     for threshold, stats in threshold_stats.items():
         threshold_precision = stats["tp"] / max(stats["tp"] + stats["fp"], 1.0)
         threshold_recall = stats["tp"] / max(stats["tp"] + stats["fn"], 1.0)
         threshold_f1 = 2.0 * threshold_precision * threshold_recall / max(threshold_precision + threshold_recall, 1e-12)
         threshold_f0_5 = f_beta(threshold_precision, threshold_recall, beta=0.5)
+        threshold_key = f"{threshold:.4f}".rstrip("0").rstrip(".").replace(".", "_")
+        sweep_metrics[f"threshold_{threshold_key}_precision"] = threshold_precision
+        sweep_metrics[f"threshold_{threshold_key}_recall"] = threshold_recall
+        sweep_metrics[f"threshold_{threshold_key}_f1"] = threshold_f1
         if threshold_f1 > best_threshold_f1:
             best_threshold = threshold
             best_threshold_precision = threshold_precision
@@ -799,11 +907,13 @@ def run_epoch(
         + 0.10 * replace_kind_acc
         - 2.0 * precision_shortfall
     )
-    return {
+    metrics = {
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
         "ranking_loss": totals["ranking_loss"] / notes,
         "masked_pitch_loss": totals["masked_pitch_loss"] / max(totals["masked_pitch_notes"], 1.0),
+        "mean_clean_surprise": totals["surprise_clean_sum"] / max(totals["surprise_clean_notes"], 1.0),
+        "mean_error_surprise": totals["surprise_error_sum"] / max(totals["surprise_error_notes"], 1.0),
         "pitch_loss": totals["pitch_loss"] / correction_notes,
         "kind_loss": totals["kind_loss"] / notes,
         "pitch_acc": totals["pitch_correct"] / correction_notes,
@@ -837,6 +947,8 @@ def run_epoch(
         "delete_rate": totals["delete_notes"] / notes,
         "det_threshold": det_threshold,
     }
+    metrics.update(sweep_metrics)
+    return metrics
 
 
 def main() -> None:
@@ -861,6 +973,8 @@ def main() -> None:
         transformer_heads=args.transformer_heads,
         transformer_ffn_dim=args.transformer_ffn_dim,
         dropout=args.dropout,
+        explicit_surprise=args.explicit_surprise,
+        surprise_embedding_dim=args.surprise_embedding_dim,
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)
@@ -900,6 +1014,8 @@ def main() -> None:
         f"kind_loss_weight={args.kind_loss_weight}, kind_class_weights={args.kind_class_weights}, "
         f"masked_pitch_loss_weight={args.masked_pitch_loss_weight}, masked_pitch_rate={args.masked_pitch_rate}, "
         f"clean_mask_batches_per_epoch={args.clean_mask_batches_per_epoch}, ranking_loss_weight={args.ranking_loss_weight}, "
+        f"explicit_surprise={args.explicit_surprise}, surprise_train_mask_rate={args.surprise_train_mask_rate}, "
+        f"surprise_eval_groups={args.surprise_eval_groups}, surprise_embedding_dim={args.surprise_embedding_dim}, "
         f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
         f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
         f"asymmetric_hard_replay={args.asymmetric_hard_replay}, fn_replay_fraction={args.fn_replay_fraction}, "
@@ -1038,6 +1154,9 @@ def main() -> None:
                     ranking_margin=args.ranking_margin,
                     ranking_top_k=args.ranking_top_k,
                     masked_pitch_loss_weight=0.0,
+                    explicit_surprise=args.explicit_surprise,
+                    surprise_train_mask_rate=args.surprise_train_mask_rate,
+                    surprise_eval_groups=args.surprise_eval_groups,
                 )
                 print(
                     f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
@@ -1079,6 +1198,9 @@ def main() -> None:
             fn_replay_weight=args.fn_replay_weight,
             fp_replay_weight=args.fp_replay_weight,
             masked_pitch_loss_weight=0.0,
+            explicit_surprise=args.explicit_surprise,
+            surprise_train_mask_rate=args.surprise_train_mask_rate,
+            surprise_eval_groups=args.surprise_eval_groups,
         )
         if args.asymmetric_hard_replay:
             previous_hard_replay = select_asymmetric_replay_samples(
@@ -1119,6 +1241,9 @@ def main() -> None:
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
             masked_pitch_loss_weight=0.0,
+            explicit_surprise=args.explicit_surprise,
+            surprise_train_mask_rate=args.surprise_train_mask_rate,
+            surprise_eval_groups=args.surprise_eval_groups,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)

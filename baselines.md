@@ -246,6 +246,31 @@ Decision rule:
 - if recall lands in `0.45-0.58`, tune curriculum timing and FN replay weight
 - if recall remains `<0.40`, move to loss/calibration redesign
 
+### B10: Explicit Masked-Context Surprise
+
+Purpose: test whether masked pitch knowledge must be exposed directly to the wrong-note detector.
+
+Design:
+
+- initialize from the best B9 checkpoint
+- keep the B9 curriculum, asymmetric replay, losses, optimizer, and evaluation protocol
+- estimate `-log P(observed_pitch | masked context)` for each note
+- project surprise plus an availability flag into a 16-dimensional embedding
+- concatenate that embedding with the Transformer hidden state before the error head
+
+Leakage protection:
+
+- the target note's pitch, pitch class, degree, chord role, and melodic-theory features are masked before context prediction
+- interval-derived columns that could reveal the target through neighboring notes are disabled in the context pass
+- training samples surprise for a subset of notes per batch
+- evaluation uses grouped masked passes so every note receives a surprise value
+
+Hypothesis:
+
+- implicit masked learning alone does not guarantee that the detector uses pitch plausibility
+- explicit surprise should shift the precision/recall frontier rather than only recalibrate thresholds
+- the primary target remains `recall > 0.5751` at precision `>=0.80`
+
 ## Proposed Main Method Candidate
 
 The most paper-worthy next method is not another pure detector. It should combine:
