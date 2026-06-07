@@ -11,7 +11,7 @@ import torch
 from .data import extract_note_events, note_features
 from .harmony import harmony_scores_for_pitches
 from .model import build_wrong_note_model
-from .train import build_explicit_surprise
+from .train import build_explicit_correction_evidence, build_explicit_surprise
 
 ACTION_NAMES = ["keep", "replace", "delete"]
 
@@ -182,7 +182,9 @@ def main() -> None:
         transformer_ffn_dim=int(train_args.get("transformer_ffn_dim", 512)),
         dropout=float(train_args.get("dropout", 0.2)),
         explicit_surprise=bool(train_args.get("explicit_surprise", False)),
+        explicit_correction_evidence=bool(train_args.get("explicit_correction_evidence", False)),
         surprise_embedding_dim=int(train_args.get("surprise_embedding_dim", 16)),
+        correction_embedding_dim=int(train_args.get("correction_embedding_dim", 32)),
     ).to(device)
     model.load_state_dict(state_dict)
     model.eval()
@@ -205,7 +207,16 @@ def main() -> None:
             elif features.shape[-1] < input_size:
                 features = torch.nn.functional.pad(features, (0, input_size - features.shape[-1]))
 
-            if bool(train_args.get("explicit_surprise", False)):
+            if bool(train_args.get("explicit_correction_evidence", False)):
+                feature_mask = torch.ones(features.shape[:2], dtype=features.dtype, device=device)
+                correction_evidence, _, _ = build_explicit_correction_evidence(
+                    model,
+                    features,
+                    feature_mask,
+                    groups=int(train_args.get("correction_evidence_groups", 4)),
+                )
+                outputs = model(features, correction_evidence=correction_evidence)
+            elif bool(train_args.get("explicit_surprise", False)):
                 feature_mask = torch.ones(features.shape[:2], dtype=features.dtype, device=device)
                 surprise, surprise_available = build_explicit_surprise(
                     model,

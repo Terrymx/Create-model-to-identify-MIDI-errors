@@ -182,6 +182,56 @@ def build_explicit_surprise(
     return surprise, available.float()
 
 
+def build_explicit_correction_evidence(
+    model: torch.nn.Module,
+    features: torch.Tensor,
+    mask: torch.Tensor,
+    groups: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Build explicit leakage-safe pitch-correction evidence for every valid note."""
+
+    valid = mask.bool()
+    observed_pitch = torch.round(features[:, :, 0] * 127.0).long().clamp(0, 127)
+    evidence = torch.zeros((*mask.shape, 7), dtype=features.dtype, device=features.device)
+    surprise = torch.zeros_like(mask)
+    available = torch.zeros_like(valid)
+    positions = torch.arange(features.shape[1], device=features.device).unsqueeze(0)
+
+    for group_index in range(max(1, groups)):
+        selected = valid & ((positions % max(1, groups)) == group_index)
+        if selected.sum() == 0:
+            continue
+        context_features = features.clone()
+        context_features[:, :, PITCH_LEAKAGE_FEATURE_COLUMNS] = 0.0
+        context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS] = torch.where(
+            selected.unsqueeze(-1),
+            torch.zeros_like(context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS]),
+            context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS],
+        )
+        pitch_logits = model.predict_pitch(context_features)
+        pitch_probability = torch.softmax(pitch_logits, dim=-1)
+        observed_probability = pitch_probability.gather(-1, observed_pitch.unsqueeze(-1)).squeeze(-1)
+        top_probability, top_pitch = pitch_probability.max(dim=-1)
+        observed_surprise = -observed_probability.clamp_min(1e-9).log()
+        entropy = -(pitch_probability * pitch_probability.clamp_min(1e-9).log()).sum(dim=-1)
+        selected_evidence = torch.stack(
+            [
+                observed_surprise.clamp(0.0, 12.0) / 12.0,
+                observed_probability,
+                top_probability,
+                (top_probability - observed_probability).clamp(0.0, 1.0),
+                entropy / torch.log(torch.tensor(128.0, device=features.device)),
+                (top_pitch != observed_pitch).float(),
+                torch.ones_like(observed_probability),
+            ],
+            dim=-1,
+        )
+        evidence = torch.where(selected.unsqueeze(-1), selected_evidence, evidence)
+        surprise = torch.where(selected, observed_surprise, surprise)
+        available |= selected
+    return evidence, surprise, available.float()
+
+
 def parse_error_rate_stages(raw_stages: str | None) -> list[list[float]] | None:
     """Parse semicolon-separated curriculum stages, e.g. '0.08,0.12;0.02,0.05;0.005,0.01'."""
 
@@ -473,6 +523,31 @@ def parse_args() -> argparse.Namespace:
         help="Feed masked-context observed-pitch surprise explicitly into the detection head.",
     )
     parser.add_argument(
+        "--explicit-correction-evidence",
+        action="store_true",
+        help=(
+            "Feed observed probability, top probability, probability gap, entropy, "
+            "top-pitch mismatch, and surprise explicitly into the detection head."
+        ),
+    )
+    parser.add_argument(
+        "--correction-evidence-groups",
+        type=int,
+        default=4,
+        help="Grouped masked-context passes used to build explicit correction evidence for every note.",
+    )
+    parser.add_argument(
+        "--correction-embedding-dim",
+        type=int,
+        default=32,
+        help="Projection width for explicit correction evidence before the detection head.",
+    )
+    parser.add_argument(
+        "--allow-detector-evidence-grad",
+        action="store_true",
+        help="Allow detection gradients through correction evidence; default detaches evidence.",
+    )
+    parser.add_argument(
         "--surprise-train-mask-rate",
         type=float,
         default=0.25,
@@ -669,8 +744,11 @@ def run_epoch(
     masked_pitch_loss_weight: float = 0.0,
     masked_pitch_rate: float = 0.15,
     explicit_surprise: bool = False,
+    explicit_correction_evidence: bool = False,
     surprise_train_mask_rate: float = 0.25,
     surprise_eval_groups: int = 4,
+    correction_evidence_groups: int = 4,
+    allow_detector_evidence_grad: bool = False,
     max_batches: int | None = None,
 ) -> dict[str, float]:
     training = optimizer is not None
@@ -719,7 +797,17 @@ def run_epoch(
         mask = batch["mask"].to(device)
 
         with torch.set_grad_enabled(training):
-            if explicit_surprise:
+            if explicit_correction_evidence and det_loss_weight > 0.0:
+                correction_evidence, surprise, surprise_available = build_explicit_correction_evidence(
+                    model,
+                    features,
+                    mask,
+                    groups=correction_evidence_groups,
+                )
+                if not allow_detector_evidence_grad:
+                    correction_evidence = correction_evidence.detach()
+                outputs = model(features, correction_evidence=correction_evidence)
+            elif explicit_surprise:
                 surprise, surprise_available = build_explicit_surprise(
                     model,
                     features,
@@ -953,6 +1041,8 @@ def run_epoch(
 
 def main() -> None:
     args = parse_args()
+    if args.explicit_surprise and args.explicit_correction_evidence:
+        raise ValueError("--explicit-surprise and --explicit-correction-evidence are mutually exclusive")
     curriculum_error_rate_stages = parse_error_rate_stages(args.curriculum_error_rate_stages)
     if not 0.0 <= args.fn_replay_fraction <= 1.0:
         raise ValueError("--fn-replay-fraction must be between 0 and 1")
@@ -974,7 +1064,9 @@ def main() -> None:
         transformer_ffn_dim=args.transformer_ffn_dim,
         dropout=args.dropout,
         explicit_surprise=args.explicit_surprise,
+        explicit_correction_evidence=args.explicit_correction_evidence,
         surprise_embedding_dim=args.surprise_embedding_dim,
+        correction_embedding_dim=args.correction_embedding_dim,
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)
@@ -1016,6 +1108,10 @@ def main() -> None:
         f"clean_mask_batches_per_epoch={args.clean_mask_batches_per_epoch}, ranking_loss_weight={args.ranking_loss_weight}, "
         f"explicit_surprise={args.explicit_surprise}, surprise_train_mask_rate={args.surprise_train_mask_rate}, "
         f"surprise_eval_groups={args.surprise_eval_groups}, surprise_embedding_dim={args.surprise_embedding_dim}, "
+        f"explicit_correction_evidence={args.explicit_correction_evidence}, "
+        f"correction_evidence_groups={args.correction_evidence_groups}, "
+        f"correction_embedding_dim={args.correction_embedding_dim}, "
+        f"allow_detector_evidence_grad={args.allow_detector_evidence_grad}, "
         f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
         f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
         f"asymmetric_hard_replay={args.asymmetric_hard_replay}, fn_replay_fraction={args.fn_replay_fraction}, "
@@ -1155,8 +1251,11 @@ def main() -> None:
                     ranking_top_k=args.ranking_top_k,
                     masked_pitch_loss_weight=0.0,
                     explicit_surprise=args.explicit_surprise,
+                    explicit_correction_evidence=args.explicit_correction_evidence,
                     surprise_train_mask_rate=args.surprise_train_mask_rate,
                     surprise_eval_groups=args.surprise_eval_groups,
+                    correction_evidence_groups=args.correction_evidence_groups,
+                    allow_detector_evidence_grad=args.allow_detector_evidence_grad,
                 )
                 print(
                     f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
@@ -1199,8 +1298,11 @@ def main() -> None:
             fp_replay_weight=args.fp_replay_weight,
             masked_pitch_loss_weight=0.0,
             explicit_surprise=args.explicit_surprise,
+            explicit_correction_evidence=args.explicit_correction_evidence,
             surprise_train_mask_rate=args.surprise_train_mask_rate,
             surprise_eval_groups=args.surprise_eval_groups,
+            correction_evidence_groups=args.correction_evidence_groups,
+            allow_detector_evidence_grad=args.allow_detector_evidence_grad,
         )
         if args.asymmetric_hard_replay:
             previous_hard_replay = select_asymmetric_replay_samples(
@@ -1242,8 +1344,11 @@ def main() -> None:
             ranking_top_k=args.ranking_top_k,
             masked_pitch_loss_weight=0.0,
             explicit_surprise=args.explicit_surprise,
+            explicit_correction_evidence=args.explicit_correction_evidence,
             surprise_train_mask_rate=args.surprise_train_mask_rate,
             surprise_eval_groups=args.surprise_eval_groups,
+            correction_evidence_groups=args.correction_evidence_groups,
+            allow_detector_evidence_grad=args.allow_detector_evidence_grad,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)

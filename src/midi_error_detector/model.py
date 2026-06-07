@@ -37,10 +37,16 @@ class BiGRUWrongNoteModel(nn.Module):
         num_layers: int = 2,
         dropout: float = 0.2,
         explicit_surprise: bool = False,
+        explicit_correction_evidence: bool = False,
         surprise_embedding_dim: int = 16,
+        correction_evidence_dim: int = 7,
+        correction_embedding_dim: int = 32,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
+        self.explicit_correction_evidence = explicit_correction_evidence
+        if explicit_surprise and explicit_correction_evidence:
+            raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         recurrent_dropout = dropout if num_layers > 1 else 0.0
         self.encoder = nn.GRU(
             input_size=input_size,
@@ -52,14 +58,24 @@ class BiGRUWrongNoteModel(nn.Module):
         )
         self.norm = nn.LayerNorm(hidden_size * 2)
         self.dropout = nn.Dropout(dropout)
-        if explicit_surprise:
+        if explicit_correction_evidence:
+            self.surprise_projection = None
+            self.correction_projection = nn.Sequential(
+                nn.Linear(correction_evidence_dim, correction_embedding_dim),
+                nn.GELU(),
+                nn.LayerNorm(correction_embedding_dim),
+            )
+            self.error_head = nn.Linear(hidden_size * 2 + correction_embedding_dim, 1)
+        elif explicit_surprise:
             self.surprise_projection = nn.Sequential(
                 nn.Linear(2, surprise_embedding_dim),
                 nn.GELU(),
             )
+            self.correction_projection = None
             self.error_head = nn.Linear(hidden_size * 2 + surprise_embedding_dim, 1)
         else:
             self.surprise_projection = None
+            self.correction_projection = None
             self.error_head = nn.Linear(hidden_size * 2, 1)
         self.kind_head = nn.Linear(hidden_size * 2, 3)
         self.pitch_head = nn.Linear(hidden_size * 2, 128)
@@ -76,10 +92,21 @@ class BiGRUWrongNoteModel(nn.Module):
         features: torch.Tensor,
         surprise: torch.Tensor | None = None,
         surprise_available: torch.Tensor | None = None,
+        correction_evidence: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         encoded = self.encode(features)
         error_features = encoded
-        if self.explicit_surprise:
+        if self.explicit_correction_evidence:
+            if self.correction_projection is None:
+                raise RuntimeError("correction projection is not initialized")
+            if correction_evidence is None:
+                correction_evidence = torch.zeros(
+                    (*features.shape[:2], 7),
+                    dtype=features.dtype,
+                    device=features.device,
+                )
+            error_features = torch.cat([encoded, self.correction_projection(correction_evidence)], dim=-1)
+        elif self.explicit_surprise:
             if self.surprise_projection is None:
                 raise RuntimeError("surprise projection is not initialized")
             if surprise is None:
@@ -112,10 +139,16 @@ class TransformerWrongNoteModel(nn.Module):
         dim_feedforward: int = 512,
         dropout: float = 0.15,
         explicit_surprise: bool = False,
+        explicit_correction_evidence: bool = False,
         surprise_embedding_dim: int = 16,
+        correction_evidence_dim: int = 7,
+        correction_embedding_dim: int = 32,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
+        self.explicit_correction_evidence = explicit_correction_evidence
+        if explicit_surprise and explicit_correction_evidence:
+            raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         self.input_projection = nn.Linear(input_size, d_model)
         self.position = SinusoidalPositionalEncoding(d_model)
         encoder_layer = nn.TransformerEncoderLayer(
@@ -130,14 +163,24 @@ class TransformerWrongNoteModel(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers, enable_nested_tensor=False)
         self.norm = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
-        if explicit_surprise:
+        if explicit_correction_evidence:
+            self.surprise_projection = None
+            self.correction_projection = nn.Sequential(
+                nn.Linear(correction_evidence_dim, correction_embedding_dim),
+                nn.GELU(),
+                nn.LayerNorm(correction_embedding_dim),
+            )
+            self.error_head = nn.Linear(d_model + correction_embedding_dim, 1)
+        elif explicit_surprise:
             self.surprise_projection = nn.Sequential(
                 nn.Linear(2, surprise_embedding_dim),
                 nn.GELU(),
             )
+            self.correction_projection = None
             self.error_head = nn.Linear(d_model + surprise_embedding_dim, 1)
         else:
             self.surprise_projection = None
+            self.correction_projection = None
             self.error_head = nn.Linear(d_model, 1)
         self.kind_head = nn.Linear(d_model, 3)
         self.pitch_head = nn.Linear(d_model, 128)
@@ -156,10 +199,21 @@ class TransformerWrongNoteModel(nn.Module):
         features: torch.Tensor,
         surprise: torch.Tensor | None = None,
         surprise_available: torch.Tensor | None = None,
+        correction_evidence: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         encoded = self.encode(features)
         error_features = encoded
-        if self.explicit_surprise:
+        if self.explicit_correction_evidence:
+            if self.correction_projection is None:
+                raise RuntimeError("correction projection is not initialized")
+            if correction_evidence is None:
+                correction_evidence = torch.zeros(
+                    (*features.shape[:2], 7),
+                    dtype=features.dtype,
+                    device=features.device,
+                )
+            error_features = torch.cat([encoded, self.correction_projection(correction_evidence)], dim=-1)
+        elif self.explicit_surprise:
             if self.surprise_projection is None:
                 raise RuntimeError("surprise projection is not initialized")
             if surprise is None:
@@ -186,7 +240,10 @@ def build_wrong_note_model(
     transformer_ffn_dim: int = 512,
     dropout: float = 0.2,
     explicit_surprise: bool = False,
+    explicit_correction_evidence: bool = False,
     surprise_embedding_dim: int = 16,
+    correction_evidence_dim: int = 7,
+    correction_embedding_dim: int = 32,
 ) -> nn.Module:
     if model_type == "bigru":
         return BiGRUWrongNoteModel(
@@ -195,7 +252,10 @@ def build_wrong_note_model(
             num_layers=num_layers,
             dropout=dropout,
             explicit_surprise=explicit_surprise,
+            explicit_correction_evidence=explicit_correction_evidence,
             surprise_embedding_dim=surprise_embedding_dim,
+            correction_evidence_dim=correction_evidence_dim,
+            correction_embedding_dim=correction_embedding_dim,
         )
     if model_type == "transformer":
         return TransformerWrongNoteModel(
@@ -206,7 +266,10 @@ def build_wrong_note_model(
             dim_feedforward=transformer_ffn_dim,
             dropout=dropout,
             explicit_surprise=explicit_surprise,
+            explicit_correction_evidence=explicit_correction_evidence,
             surprise_embedding_dim=surprise_embedding_dim,
+            correction_evidence_dim=correction_evidence_dim,
+            correction_embedding_dim=correction_embedding_dim,
         )
     raise ValueError(f"Unknown model type: {model_type}")
 

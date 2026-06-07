@@ -27,6 +27,72 @@ errors with plausible ornamentation and other clean notes.
 
 ## Planned Route
 
+## New Main Pipeline: Explicit Correction-to-Detection
+
+This is the primary direction after the Step 2 and verifier experiments.
+
+### Stage 1 - From-Scratch Explicit Detection
+
+Train the detector from scratch. Detection remains the main task; correction is an
+explicit evidence branch inside the same pipeline.
+
+For each note:
+
+1. mask pitch-derived and leakage-prone features at the target position;
+2. predict a clean pitch distribution from bidirectional context;
+3. explicitly compute:
+   - observed-pitch surprise;
+   - observed-pitch probability;
+   - top predicted pitch probability;
+   - top-vs-observed probability gap;
+   - pitch-distribution entropy;
+   - whether the top pitch differs from the observed pitch;
+   - evidence availability;
+4. project these seven interpretable values and concatenate them with the
+   Transformer state before the detection head;
+5. optimize detection as the main objective, with pitch correction and clean
+   masked reconstruction as auxiliary supervision.
+
+The correction evidence is detached by default before entering the detection head.
+This prevents the detector loss from manipulating the pitch distribution into an
+easy but musically meaningless classification signal.
+
+Training data use:
+
+- clean MIDI: masked pitch reconstruction, teaching what a plausible note should be;
+- corrupted MIDI: wrong-note detection, error kind, and clean replacement pitch;
+- early epochs: higher and more diverse corruption rates;
+- late epochs: sparse corruption rates aligned with deployment;
+- each epoch: FN-heavy asymmetric hard replay from the previous epoch.
+
+This stage does not initialize from any previous detector checkpoint.
+
+### Stage 2 - Add New Structural Evidence
+
+If Stage 1 improves the PR frontier, add evidence that is not already present:
+
+- phrase/motif repetition consistency;
+- cross-occurrence comparison of repeated musical material;
+- longer-range form and cadence context;
+- separately trained forward/backward token likelihoods.
+
+### Stage 3 - Ensemble
+
+Train several Stage 1/2 models with different seeds and context choices. Prefer an
+heterogeneous ensemble over copies of the exact same model.
+
+### Stage 4 - Precision-Constrained Cascade
+
+Use a high-recall Stage 1 candidate generator and a verifier only after the main
+model receives stronger structural evidence. Select the operating threshold on a
+file-held-out calibration split with a precision safety margin.
+
+### Stage 5 - Product Calibration
+
+Calibrate to a target precision above the deployment requirement, and report a
+confidence interval or risk-control bound so that validation-to-test drift is less
+likely to cross below precision `0.80`.
+
 ### Step A - Multi-Window Surprise Validation
 
 Freeze the Step 2 model and measure masked-context surprise with note windows of

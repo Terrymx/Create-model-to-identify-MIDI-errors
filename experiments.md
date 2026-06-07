@@ -1113,3 +1113,51 @@ Conclusion:
   separately trained bidirectional correction likelihood
 - retain the verifier as an ablation and possible product post-processor, but do
   not make it the main training direction
+
+## 2026-06-07 - Planned from-scratch explicit correction-to-detection run
+
+Motivation:
+
+- Step 1A showed that curriculum and FN-heavy replay improve recall.
+- Step 2 showed that explicit surprise is materially better than implicit masked
+  learning.
+- Multi-window surprise and a lightweight verifier provided only small additional
+  gains because they reused mostly the same information.
+- The next model should make the entire correction distribution explicit, not only
+  a single surprise scalar.
+
+Architecture:
+
+- start a new Transformer from random initialization
+- generate a leakage-safe masked-context pitch distribution for every note
+- explicitly feed seven correction signals into the detection head:
+  - normalized observed-pitch surprise
+  - observed-pitch probability
+  - top predicted pitch probability
+  - top-vs-observed probability gap
+  - normalized entropy
+  - top-pitch mismatch flag
+  - evidence availability flag
+- detach these signals before the detection head by default
+- preserve the normal pitch and error-kind heads
+
+Training:
+
+- clean masked reconstruction before every corrupted epoch
+- three-stage error-rate curriculum
+- FN-heavy asymmetric replay from the previous epoch
+- sparse evaluation at error rate `0.01`
+- checkpoint selection by `precision_recall_score`
+- no initialization from earlier checkpoints
+
+Primary success criterion:
+
+- improve recall over `0.5307` while precision remains `>=0.80`
+- stretch target: recall `>=0.60` at precision `>=0.80`
+
+Interpretation rule:
+
+- if the full explicit evidence improves over scalar surprise, retain it as the new
+  main detector architecture
+- if it does not, the bottleneck is not evidence wiring; proceed to genuinely new
+  phrase/motif-level information rather than more score fusion
