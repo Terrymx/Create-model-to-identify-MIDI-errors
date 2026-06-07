@@ -67,6 +67,11 @@ model, generate high-recall candidates, and train a lightweight verifier:
 Stage 2 cannot recover a note missed by Stage 1, so Stage 1 candidate recall must
 stay comfortably above the final recall target.
 
+The first lightweight probe produced only about `+0.0106` recall at precision
+`>=0.80` on the exploratory test frontier. This supports retaining a verifier as a
+post-processing ablation, but not scaling it before adding genuinely new contextual
+signals.
+
 ### Step D - Ensemble or Larger Verifier
 
 Use only after the single-model cascade is understood:

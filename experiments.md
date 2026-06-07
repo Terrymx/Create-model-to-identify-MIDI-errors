@@ -1043,3 +1043,73 @@ Conclusion:
   the frozen Step 2 score, multi-window surprise, and theory features; only scale
   that approach if it improves recall at precision `>=0.80` on a file-held-out
   calibration split
+
+## 2026-06-07 - Candidate verifier probe
+
+Purpose:
+
+- test whether the remaining Step 2 false positives can be removed without
+  retraining the Transformer
+- use the low Stage 1 threshold `0.45` to preserve a high recall ceiling
+- train a small MLP verifier using:
+  - Step 2 probability and logit
+  - pitch-head observed probability, entropy, top probability, and pitch margin
+  - `64`, `128`, and `256` note surprise values and their aggregate statistics
+  - local surprise means
+  - action-head probabilities
+  - all existing MIDI and theory features
+
+Leakage controls:
+
+- the MAESTRO validation split was divided by MIDI file
+- 103 validation files trained the verifier
+- 34 disjoint validation files selected the verifier threshold
+- the test split was evaluated only after threshold selection
+- overall recall uses every error note as its denominator, including errors missed
+  by Stage 1
+
+Stage 1 candidate coverage:
+
+| Split | Candidate precision | Recall ceiling |
+| --- | ---: | ---: |
+| verifier train | 0.5472 | 0.6703 |
+| calibration | 0.5498 | 0.6621 |
+| test | 0.5758 | 0.7153 |
+
+Calibration-selected operating point:
+
+- verifier threshold: `0.41`
+- calibration precision: `0.8026`
+- calibration recall: `0.4833`
+- test precision: `0.7980`
+- test recall: `0.5460`
+- test F1: `0.6484`
+
+Test PR-frontier diagnostic:
+
+- the adjacent threshold `0.42` gives precision `0.8028`, recall `0.5413`,
+  F1 `0.6466`
+- this threshold is reported as a diagnostic point, not as the preselected result
+- the best test F1 is `0.6666` at threshold `0.28`, with precision `0.7208` and
+  recall `0.6199`
+
+Comparison:
+
+- Step 2 precision-constrained baseline: precision `0.8012`, recall `0.5307`,
+  F1 `0.6385`
+- verifier exploratory frontier at precision `>=0.80`: precision `0.8028`,
+  recall `0.5413`, F1 `0.6466`
+- recall gain at the precision constraint: about `0.0106`
+
+Conclusion:
+
+- candidate verification produces a real but small upward PR shift
+- the calibration-selected threshold missed the test precision constraint by
+  `0.0020`, showing mild validation-to-test score shift
+- multi-window surprise plus current theory features do not separate the difficult
+  FP population strongly enough to reach recall `0.60` at precision `0.80`
+- a larger cascade alone is unlikely to close the remaining gap unless it receives
+  genuinely new context, such as phrase-level motif/repetition evidence or a
+  separately trained bidirectional correction likelihood
+- retain the verifier as an ablation and possible product post-processor, but do
+  not make it the main training direction
