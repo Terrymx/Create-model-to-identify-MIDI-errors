@@ -1,0 +1,94 @@
+{
+  "checkpoint": "checkpoints\\transformer_explicit_surprise_step2.pt",
+  "eval_split": "validation",
+  "error_rate": 0.01,
+  "candidate_threshold": 0.55,
+  "scales": [
+    64,
+    128,
+    256
+  ],
+  "notes": 1261824,
+  "error_notes": 14214,
+  "candidate_count": 14783,
+  "candidate_positive_count": 8977,
+  "candidate_precision": 0.607251572752486,
+  "candidate_recall": 0.6315604333755452,
+  "signals": [
+    {
+      "name": "surprise_64",
+      "auc": 0.5363821794212031,
+      "tp_mean": 8.784290313720703,
+      "tp_std": 4.54730749130249,
+      "fp_mean": 8.263260841369629,
+      "fp_std": 4.605712413787842,
+      "mean_gap": 0.5210294723510742
+    },
+    {
+      "name": "surprise_128",
+      "auc": 0.5433861848730351,
+      "tp_mean": 8.541584968566895,
+      "tp_std": 4.605795383453369,
+      "fp_mean": 7.864003658294678,
+      "fp_std": 4.394985675811768,
+      "mean_gap": 0.6775813102722168
+    },
+    {
+      "name": "surprise_256",
+      "auc": 0.5425959194298776,
+      "tp_mean": 7.525660991668701,
+      "tp_std": 4.059641361236572,
+      "fp_mean": 6.935084819793701,
+      "fp_std": 3.860602855682373,
+      "mean_gap": 0.590576171875
+    },
+    {
+      "name": "surprise_mean",
+      "auc": 0.5511700951537997,
+      "tp_mean": 8.283845901489258,
+      "tp_std": 3.5068397521972656,
+      "fp_mean": 7.6874494552612305,
+      "fp_std": 3.3672187328338623,
+      "mean_gap": 0.5963964462280273
+    },
+    {
+      "name": "surprise_min",
+      "auc": 0.5522057152908583,
+      "tp_mean": 5.6417951583862305,
+      "tp_std": 3.251352310180664,
+      "fp_mean": 5.052430629730225,
+      "fp_std": 3.0310354232788086,
+      "mean_gap": 0.5893645286560059
+    },
+    {
+      "name": "surprise_max",
+      "auc": 0.537347069179855,
+      "tp_mean": 11.007295608520508,
+      "tp_std": 4.472683429718018,
+      "fp_mean": 10.472214698791504,
+      "fp_std": 4.4235310554504395,
+      "mean_gap": 0.5350809097290039
+    },
+    {
+      "name": "surprise_range",
+      "auc": 0.49113014385789594,
+      "tp_mean": 5.365499973297119,
+      "tp_std": 3.442348003387451,
+      "fp_mean": 5.419783592224121,
+      "fp_std": 3.349954128265381,
+      "mean_gap": -0.05428361892700195
+    }
+  ],
+  "best_signal": {
+    "name": "surprise_min",
+    "auc": 0.5522057152908583,
+    "tp_mean": 5.6417951583862305,
+    "tp_std": 3.251352310180664,
+    "fp_mean": 5.052430629730225,
+    "fp_std": 3.0310354232788086,
+    "mean_gap": 0.5893645286560059
+  },
+  "wide_auc": 0.5425959194298776,
+  "incremental_auc": 0.009609795860980652,
+  "recommendation": "Do not retrain yet; the tested scales are mostly redundant, so inspect scale alignment or move to the cascade probe."
+}

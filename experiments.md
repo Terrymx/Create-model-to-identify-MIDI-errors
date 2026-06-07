@@ -950,3 +950,96 @@ Success criteria:
 - primary: `recall > 0.5751` at precision `>=0.80`
 - diagnostic: mean error surprise should exceed mean clean surprise
 - compare the full PR frontier, not only the selected threshold
+
+Observed result:
+
+- completed all 36 epochs without errors
+- best checkpoint was saved at epoch 36
+- checkpoint: `checkpoints\transformer_explicit_surprise_step2.pt`
+
+Best saved test metrics:
+
+- `precision_recall_score=0.7812`
+- `precision_constrained_threshold=0.85`
+- `precision_constrained_precision=0.8012`
+- `precision_constrained_recall=0.5307`
+- `precision_constrained_f1=0.6385`
+- `best_det_threshold=0.70`
+- `best_det_precision=0.7188`
+- `best_det_recall=0.6123`
+- `best_det_f1=0.6613`
+- `best_det_f0_5_threshold=0.93`
+- `best_det_f0_5_precision=0.8598`
+- `best_det_f0_5_recall=0.4623`
+- `best_det_f0_5=0.7336`
+- `mean_clean_surprise=2.5835`
+- `mean_error_surprise=6.7222`
+- `replace_pitch_top1=0.4847`
+- `replace_pitch_top3=0.8716`
+- `replace_kind_acc=0.7620`
+
+Comparison:
+
+- Step 1A: precision `0.8092`, recall `0.4256`, F1 `0.5578`
+- Step 2: precision `0.8012`, recall `0.5307`, F1 `0.6385`
+- explicit surprise improved precision-constrained recall by `0.1051`
+- historical target baseline remains precision `0.8037`, recall `0.5751`
+
+Conclusion:
+
+- explicit masked-context surprise substantially shifts the PR frontier upward
+- the strong error/clean surprise separation confirms that contextual pitch likelihood contains useful detection information
+- Step 2 still misses the historical precision-constrained recall target by about `0.0444`
+- the next iteration should focus on calibrating/fusing the explicit surprise signal rather than removing it
+
+## 2026-06-07 - Multi-window surprise validation
+
+Purpose:
+
+- test the Tier 2 hypothesis before committing to another full training run
+- keep `transformer_explicit_surprise_step2.pt` frozen
+- compare masked-context surprise at `64`, `128`, and `256` notes on the same
+  validation candidates
+- use overlapping short windows and prefer the result where each note is closest
+  to the center of its window
+
+Protocol:
+
+- split: MAESTRO validation
+- evaluation corruption rate: `0.01`
+- Stage 1 candidate threshold: `0.55`
+- no test-set threshold selection
+- output: `training_logs/multiscale_surprise_validation.json`
+
+Candidate coverage:
+
+- total notes: `1,261,824`
+- error notes: `14,214`
+- candidates: `14,783`
+- candidate precision: `0.6073`
+- candidate recall ceiling: `0.6316`
+
+TP/FP separability:
+
+| Signal | AUC | TP mean | FP mean |
+| --- | ---: | ---: | ---: |
+| surprise 64 | 0.5364 | 8.7843 | 8.2633 |
+| surprise 128 | 0.5434 | 8.5416 | 7.8640 |
+| surprise 256 | 0.5426 | 7.5257 | 6.9351 |
+| three-scale mean | 0.5512 | 8.2838 | 7.6874 |
+| three-scale minimum | 0.5522 | 5.6418 | 5.0524 |
+
+Conclusion:
+
+- the multi-window hypothesis is directionally supported: requiring surprise to
+  remain high across scales separates TP from FP slightly better than the existing
+  `256`-note surprise alone
+- the incremental AUC is only `0.0096`, which is too small to justify a full
+  multi-window retraining run by itself
+- 64/128/256 surprise values are largely redundant for the current pitch head
+- keep multi-window surprise as a possible auxiliary feature, but do not treat it
+  as the main route to the required precision gain
+- the next low-cost experiment should test learned candidate verification using
+  the frozen Step 2 score, multi-window surprise, and theory features; only scale
+  that approach if it improves recall at precision `>=0.80` on a file-held-out
+  calibration split
