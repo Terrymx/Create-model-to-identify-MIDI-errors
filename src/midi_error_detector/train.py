@@ -42,7 +42,11 @@ PITCH_CONTEXT_FEATURE_COLUMNS = [
 PITCH_LEAKAGE_FEATURE_COLUMNS = [4, 15, 24, 25, 26, 27, 28, 29, 30, 31, 32]
 
 
-def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[str, torch.Tensor]) -> tuple[list[str], list[str], list[str]]:
+def load_compatible_state_dict(
+    model: torch.nn.Module,
+    checkpoint_state: dict[str, torch.Tensor],
+    error_head_copy_columns: int | None = None,
+) -> tuple[list[str], list[str], list[str]]:
     """Load matching checkpoint weights and partially copy widened input projections."""
 
     model_state = model.state_dict()
@@ -71,6 +75,8 @@ def load_compatible_state_dict(model: torch.nn.Module, checkpoint_state: dict[st
             copied = model_value.clone()
             rows = min(model_value.shape[0], checkpoint_value.shape[0])
             cols = min(model_value.shape[1], checkpoint_value.shape[1])
+            if error_head_copy_columns is not None:
+                cols = min(cols, error_head_copy_columns)
             copied[:rows, :cols] = checkpoint_value[:rows, :cols]
             adapted_state[name] = copied
             partial.append(f"{name} old={tuple(checkpoint_value.shape)} new={tuple(model_value.shape)} copied_cols={cols}")
@@ -420,6 +426,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", default="v3.0.0", help="MAESTRO version, e.g. v3.0.0")
     parser.add_argument("--output", default="checkpoints/bigru_wrong_note.pt")
     parser.add_argument("--init-checkpoint", default=None, help="Optional checkpoint to initialize/fine-tune from.")
+    parser.add_argument(
+        "--evidence-checkpoint",
+        default=None,
+        help="Optional frozen clean-music checkpoint used to generate correction evidence.",
+    )
+    parser.add_argument(
+        "--freeze-detector-backbone",
+        action="store_true",
+        help="Train only the explicit evidence projection and detection head.",
+    )
+    parser.add_argument(
+        "--clean-only",
+        action="store_true",
+        help="Train only clean masked-pitch reconstruction and save the final likelihood checkpoint.",
+    )
     parser.add_argument("--eval-split", default="test", choices=["validation", "test"], help="Held-out split used for metrics")
     parser.add_argument("--epochs", type=int, default=20, help="Corrupted-data fine-tuning epochs")
     parser.add_argument(
@@ -749,10 +770,13 @@ def run_epoch(
     surprise_eval_groups: int = 4,
     correction_evidence_groups: int = 4,
     allow_detector_evidence_grad: bool = False,
+    evidence_model: torch.nn.Module | None = None,
     max_batches: int | None = None,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
+    if evidence_model is not None:
+        evidence_model.eval()
     totals = {
         "loss": 0.0,
         "det_loss": 0.0,
@@ -798,12 +822,19 @@ def run_epoch(
 
         with torch.set_grad_enabled(training):
             if explicit_correction_evidence and det_loss_weight > 0.0:
-                correction_evidence, surprise, surprise_available = build_explicit_correction_evidence(
-                    model,
-                    features,
-                    mask,
-                    groups=correction_evidence_groups,
+                evidence_source = evidence_model if evidence_model is not None else model
+                evidence_grad_enabled = (
+                    training
+                    and evidence_model is None
+                    and allow_detector_evidence_grad
                 )
+                with torch.set_grad_enabled(evidence_grad_enabled):
+                    correction_evidence, surprise, surprise_available = build_explicit_correction_evidence(
+                        evidence_source,
+                        features,
+                        mask,
+                        groups=correction_evidence_groups,
+                    )
                 if not allow_detector_evidence_grad:
                     correction_evidence = correction_evidence.detach()
                 outputs = model(features, correction_evidence=correction_evidence)
@@ -1070,7 +1101,18 @@ def main() -> None:
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)
-        loaded_keys, partial_keys, skipped_keys = load_compatible_state_dict(model, checkpoint["model_state_dict"])
+        checkpoint_args = checkpoint.get("args", {})
+        source_uses_surprise = bool(checkpoint_args.get("explicit_surprise", False))
+        error_head_copy_columns = None
+        if args.explicit_correction_evidence and source_uses_surprise:
+            error_head_copy_columns = (
+                args.transformer_d_model if args.model == "transformer" else args.hidden_size * 2
+            )
+        loaded_keys, partial_keys, skipped_keys = load_compatible_state_dict(
+            model,
+            checkpoint["model_state_dict"],
+            error_head_copy_columns=error_head_copy_columns,
+        )
         print(
             f"loaded init checkpoint={args.init_checkpoint} "
             f"stage={checkpoint.get('stage')} epoch={checkpoint.get('epoch')}",
@@ -1082,9 +1124,46 @@ def main() -> None:
                 f"skipped={skipped_keys}",
                 flush=True,
             )
+    evidence_model = None
+    if args.evidence_checkpoint:
+        if not args.explicit_correction_evidence:
+            raise ValueError("--evidence-checkpoint requires --explicit-correction-evidence")
+        evidence_checkpoint = torch.load(args.evidence_checkpoint, map_location=device)
+        evidence_args = evidence_checkpoint.get("args", {})
+        evidence_model = build_wrong_note_model(
+            model_type=evidence_args.get("model", "transformer"),
+            input_size=evidence_args.get("input_size", FEATURE_SIZE),
+            hidden_size=evidence_args.get("hidden_size", 256),
+            num_layers=evidence_args.get("num_layers", 4),
+            transformer_d_model=evidence_args.get("transformer_d_model", 192),
+            transformer_heads=evidence_args.get("transformer_heads", 4),
+            transformer_ffn_dim=evidence_args.get("transformer_ffn_dim", 512),
+            dropout=evidence_args.get("dropout", 0.2),
+        ).to(device)
+        evidence_model.load_state_dict(evidence_checkpoint["model_state_dict"])
+        evidence_model.eval()
+        for parameter in evidence_model.parameters():
+            parameter.requires_grad = False
+        print(
+            f"loaded frozen evidence checkpoint={args.evidence_checkpoint} "
+            f"stage={evidence_checkpoint.get('stage')} epoch={evidence_checkpoint.get('epoch')}",
+            flush=True,
+        )
+    if args.freeze_detector_backbone:
+        if not args.explicit_correction_evidence:
+            raise ValueError("--freeze-detector-backbone requires --explicit-correction-evidence")
+        for name, parameter in model.named_parameters():
+            parameter.requires_grad = name.startswith("correction_projection.") or name.startswith("error_head.")
+        trainable_names = [name for name, parameter in model.named_parameters() if parameter.requires_grad]
+        print(f"frozen detector backbone; trainable modules={trainable_names}", flush=True)
     args.input_size = FEATURE_SIZE
-    print(f"model={args.model} parameters={sum(param.numel() for param in model.parameters()):,}", flush=True)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    print(
+        f"model={args.model} parameters={sum(param.numel() for param in model.parameters()):,} "
+        f"trainable={sum(param.numel() for param in trainable_parameters):,}",
+        flush=True,
+    )
+    optimizer = torch.optim.AdamW(trainable_parameters, lr=args.lr)
     scheduler_mode = "min" if args.save_metric == "loss" else "max"
     scheduler = None
     if args.lr_patience > 0:
@@ -1164,6 +1243,20 @@ def main() -> None:
             masked_pitch_rate=args.masked_pitch_rate,
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
+
+    if args.clean_only:
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "args": vars(args),
+                "stage": "clean_likelihood",
+                "epoch": args.clean_epochs,
+                "valid_metrics": train_metrics if args.clean_epochs > 0 else {},
+            },
+            output,
+        )
+        print(f"saved clean likelihood checkpoint={output}", flush=True)
+        return
 
     train_error_rates = args.train_error_rates or [args.train_error_rate]
     calibration_error_rates = args.calibration_error_rates or train_error_rates
@@ -1256,6 +1349,7 @@ def main() -> None:
                     surprise_eval_groups=args.surprise_eval_groups,
                     correction_evidence_groups=args.correction_evidence_groups,
                     allow_detector_evidence_grad=args.allow_detector_evidence_grad,
+                    evidence_model=evidence_model,
                 )
                 print(
                     f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
@@ -1303,6 +1397,7 @@ def main() -> None:
             surprise_eval_groups=args.surprise_eval_groups,
             correction_evidence_groups=args.correction_evidence_groups,
             allow_detector_evidence_grad=args.allow_detector_evidence_grad,
+            evidence_model=evidence_model,
         )
         if args.asymmetric_hard_replay:
             previous_hard_replay = select_asymmetric_replay_samples(
@@ -1349,6 +1444,7 @@ def main() -> None:
             surprise_eval_groups=args.surprise_eval_groups,
             correction_evidence_groups=args.correction_evidence_groups,
             allow_detector_evidence_grad=args.allow_detector_evidence_grad,
+            evidence_model=evidence_model,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)
