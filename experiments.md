@@ -1177,3 +1177,21 @@ platform for later stages even though its standalone sparse-error frontier is wo
 - Primary comparison: recall at precision `>= 0.80`.
 - Secondary comparison: gain relative to each branch's starting frontier and error
   complementarity for a later heterogeneous ensemble.
+
+## 2026-06-09 - External Likelihood A/B Result
+
+- clean likelihood teacher completed 8 epochs; masked reconstruction loss decreased
+  from `3.1065` to `0.9528`
+- Branch A, initialized from Step 2, best epoch 7:
+  - precision `0.8006`
+  - recall `0.5319`
+  - F1 `0.6391`
+- Branch B, initialized from the from-scratch explicit-correction detector, best epoch 13:
+  - precision `0.8036`
+  - recall `0.4267`
+  - F1 `0.5574`
+- Branch A remains the stronger platform.
+- Branch A improved recall by only about `0.0012` over the original Step 2 result,
+  so the external likelihood Gate 1 did not pass.
+- Next action: measure teacher clean/error separation and redundancy with the
+  internal Step 2 surprise signal on the validation split.
