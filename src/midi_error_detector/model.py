@@ -185,14 +185,25 @@ class TransformerWrongNoteModel(nn.Module):
         self.kind_head = nn.Linear(d_model, 3)
         self.pitch_head = nn.Linear(d_model, 128)
 
-    def encode(self, features: torch.Tensor) -> torch.Tensor:
+    def encode(self, features: torch.Tensor, causal: bool = False) -> torch.Tensor:
         encoded = self.input_projection(features)
         encoded = self.position(encoded)
-        encoded = self.encoder(encoded)
+        attention_mask = None
+        if causal:
+            attention_mask = torch.triu(
+                torch.ones(
+                    features.shape[1],
+                    features.shape[1],
+                    dtype=torch.bool,
+                    device=features.device,
+                ),
+                diagonal=1,
+            )
+        encoded = self.encoder(encoded, mask=attention_mask)
         return self.dropout(self.norm(encoded))
 
-    def predict_pitch(self, features: torch.Tensor) -> torch.Tensor:
-        return self.pitch_head(self.encode(features))
+    def predict_pitch(self, features: torch.Tensor, causal: bool = False) -> torch.Tensor:
+        return self.pitch_head(self.encode(features, causal=causal))
 
     def forward(
         self,

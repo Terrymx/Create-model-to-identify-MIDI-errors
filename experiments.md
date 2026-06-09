@@ -1195,3 +1195,24 @@ platform for later stages even though its standalone sparse-error frontier is wo
   so the external likelihood Gate 1 did not pass.
 - Next action: measure teacher clean/error separation and redundancy with the
   internal Step 2 surprise signal on the validation split.
+
+## 2026-06-09 - External Likelihood Diagnostic
+
+- validation notes: `1,261,824`, including `14,214` synthetic errors
+- legacy evidence masking:
+  - clean perplexity `1294.54`
+  - all-note AUC `0.5860`
+  - hard-candidate AUC `0.4977`
+- train-aligned target-only masking:
+  - clean perplexity `8.06`
+  - all-note AUC `0.6284`
+  - hard-candidate AUC `0.5302`
+- Step 2 internal surprise:
+  - all-note AUC `0.7862`
+  - hard-candidate AUC `0.5426`
+- The original external-likelihood experiment had a material train/inference
+  masking mismatch, but correcting it still does not create a useful hard-candidate
+  ranking gain.
+- Decision: do not rerun the same bidirectional teacher fusion. Proceed to separately
+  trained forward and backward likelihood models, which provide genuinely different
+  one-sided evidence.

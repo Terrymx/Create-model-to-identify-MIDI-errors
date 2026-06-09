@@ -1,0 +1,78 @@
+{
+  "teacher_checkpoint": "checkpoints\\transformer_clean_likelihood.pt",
+  "detector_checkpoint": "checkpoints\\transformer_explicit_surprise_step2.pt",
+  "eval_split": "validation",
+  "error_rate": 0.01,
+  "valid_notes": 1261824,
+  "error_notes": 14214,
+  "teacher_clean_perplexity": 1294.5381768205311,
+  "aligned_teacher_clean_perplexity": 8.060859259926962,
+  "pearson_correlation": 0.32264324566894587,
+  "spearman_correlation": 0.32416747654465555,
+  "all_notes": {
+    "external_teacher": {
+      "auc": 0.5860323046007854,
+      "clean_mean": 7.165909290313721,
+      "clean_std": 4.8055033683776855,
+      "error_mean": 8.636795997619629,
+      "error_std": 5.000044345855713,
+      "mean_gap": 1.4708867073059082,
+      "js_divergence": 0.01204866030576343
+    },
+    "external_teacher_train_aligned": {
+      "auc": 0.6283503444825426,
+      "clean_mean": 2.0870201587677,
+      "clean_std": 2.673562526702881,
+      "error_mean": 3.383955955505371,
+      "error_std": 3.2748539447784424,
+      "mean_gap": 1.296935796737671,
+      "js_divergence": 0.0254370780270637
+    },
+    "step2_internal": {
+      "auc": 0.7862499130418407,
+      "clean_mean": 2.8276708126068115,
+      "clean_std": 3.1701934337615967,
+      "error_mean": 6.609442234039307,
+      "error_std": 4.1369428634643555,
+      "mean_gap": 3.781771421432495,
+      "js_divergence": 0.1345260205399566
+    }
+  },
+  "candidates": {
+    "threshold": 0.55,
+    "count": 14783,
+    "precision": 0.6072515845298767,
+    "recall": 0.6315604448318481,
+    "signals": {
+      "external_teacher": {
+        "auc": 0.49765280284737307,
+        "clean_mean": 8.8938627243042,
+        "clean_std": 4.860170364379883,
+        "error_mean": 8.849594116210938,
+        "error_std": 4.9695281982421875,
+        "mean_gap": -0.04426860809326172,
+        "js_divergence": 0.0030884246172769502
+      },
+      "external_teacher_train_aligned": {
+        "auc": 0.5302041067863136,
+        "clean_mean": 3.3916947841644287,
+        "clean_std": 3.1485843658447266,
+        "error_mean": 3.7673332691192627,
+        "error_std": 3.353121280670166,
+        "mean_gap": 0.375638484954834,
+        "js_divergence": 0.00568850143954849
+      },
+      "step2_internal": {
+        "auc": 0.5425959194298776,
+        "clean_mean": 6.935084819793701,
+        "clean_std": 3.860602855682373,
+        "error_mean": 7.525660991668701,
+        "error_std": 4.059641361236572,
+        "mean_gap": 0.590576171875,
+        "js_divergence": 0.00620785513704154
+      }
+    },
+    "teacher_auc_increment": -0.012391812643564037
+  },
+  "recommendation": "The teacher signal is too weak among hard candidates. Improve the clean-music model or its masking objective before another detector training run."
+}

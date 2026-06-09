@@ -13,6 +13,7 @@ from tqdm import tqdm
 from midi_error_detector.data import FEATURE_SIZE, MaestroWrongNoteDataset
 from midi_error_detector.model import build_wrong_note_model
 from midi_error_detector.train import (
+    PITCH_CONTEXT_FEATURE_COLUMNS,
     build_explicit_correction_evidence,
     build_explicit_surprise,
 )
@@ -98,13 +99,15 @@ def rank_auc(values: torch.Tensor, labels: torch.Tensor) -> float:
     order = torch.argsort(values)
     sorted_values = values[order]
     ranks = torch.empty(len(values), dtype=torch.double)
-    start = 0
-    while start < len(values):
-        end = start + 1
-        while end < len(values) and sorted_values[end] == sorted_values[start]:
-            end += 1
-        ranks[order[start:end]] = (start + 1 + end) / 2.0
-        start = end
+    _, inverse, counts = torch.unique_consecutive(
+        sorted_values,
+        return_inverse=True,
+        return_counts=True,
+    )
+    ends = counts.cumsum(0)
+    starts = ends - counts
+    average_rank = (starts.double() + 1.0 + ends.double()) / 2.0
+    ranks[order] = average_rank[inverse]
     positive_rank_sum = float(ranks[labels].sum())
     return (
         positive_rank_sum - positive_count * (positive_count + 1) / 2.0
@@ -123,13 +126,15 @@ def average_ranks(values: torch.Tensor) -> torch.Tensor:
     order = torch.argsort(values)
     sorted_values = values[order]
     ranks = torch.empty(len(values), dtype=torch.double)
-    start = 0
-    while start < len(values):
-        end = start + 1
-        while end < len(values) and sorted_values[end] == sorted_values[start]:
-            end += 1
-        ranks[order[start:end]] = (start + 1 + end) / 2.0
-        start = end
+    _, inverse, counts = torch.unique_consecutive(
+        sorted_values,
+        return_inverse=True,
+        return_counts=True,
+    )
+    ends = counts.cumsum(0)
+    starts = ends - counts
+    average_rank = (starts.double() + 1.0 + ends.double()) / 2.0
+    ranks[order] = average_rank[inverse]
     return ranks
 
 
@@ -163,6 +168,39 @@ def signal_summary(values: torch.Tensor, labels: torch.Tensor) -> dict[str, floa
     }
 
 
+@torch.no_grad()
+def build_train_aligned_surprise(
+    model: torch.nn.Module,
+    features: torch.Tensor,
+    mask: torch.Tensor,
+    groups: int,
+) -> torch.Tensor:
+    """Mask only target positions, matching clean masked-pitch training."""
+
+    valid = mask.bool()
+    observed_pitch = torch.round(features[:, :, 0] * 127.0).long().clamp(0, 127)
+    surprise = torch.zeros_like(mask)
+    positions = torch.arange(features.shape[1], device=features.device).unsqueeze(0)
+    group_count = max(1, groups)
+    for group_index in range(group_count):
+        selected = valid & ((positions % group_count) == group_index)
+        if not selected.any():
+            continue
+        context_features = features.clone()
+        context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS] = torch.where(
+            selected.unsqueeze(-1),
+            torch.zeros_like(context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS]),
+            context_features[:, :, PITCH_CONTEXT_FEATURE_COLUMNS],
+        )
+        pitch_logits = model.predict_pitch(context_features)
+        observed_log_probability = torch.log_softmax(pitch_logits, dim=-1).gather(
+            dim=-1,
+            index=observed_pitch.unsqueeze(-1),
+        ).squeeze(-1)
+        surprise = torch.where(selected, -observed_log_probability, surprise)
+    return surprise
+
+
 def write_markdown(path: Path, result: dict) -> None:
     all_notes = result["all_notes"]
     candidates = result["candidates"]
@@ -173,7 +211,8 @@ def write_markdown(path: Path, result: dict) -> None:
         f"- error rate: `{result['error_rate']}`",
         f"- valid notes: `{result['valid_notes']}`",
         f"- error notes: `{result['error_notes']}`",
-        f"- teacher clean masked-pitch perplexity: `{result['teacher_clean_perplexity']:.4f}`",
+        f"- legacy teacher clean perplexity: `{result['teacher_clean_perplexity']:.4f}`",
+        f"- train-aligned teacher clean perplexity: `{result['aligned_teacher_clean_perplexity']:.4f}`",
         f"- teacher/base Pearson correlation: `{result['pearson_correlation']:.4f}`",
         f"- teacher/base Spearman correlation: `{result['spearman_correlation']:.4f}`",
         "",
@@ -226,6 +265,7 @@ def main() -> None:
     )
 
     teacher_parts: list[torch.Tensor] = []
+    aligned_teacher_parts: list[torch.Tensor] = []
     base_parts: list[torch.Tensor] = []
     label_parts: list[torch.Tensor] = []
     candidate_parts: list[torch.Tensor] = []
@@ -237,6 +277,12 @@ def main() -> None:
         detector_features = adapt_features(raw_features, detector_args.input_size)
 
         _, teacher_surprise, _ = build_explicit_correction_evidence(
+            teacher,
+            teacher_features,
+            mask.float(),
+            groups=args.groups,
+        )
+        aligned_teacher_surprise = build_train_aligned_surprise(
             teacher,
             teacher_features,
             mask.float(),
@@ -257,35 +303,43 @@ def main() -> None:
         )
         candidates = (torch.sigmoid(outputs["error_logits"]) >= args.candidate_threshold) & mask
         teacher_parts.append(teacher_surprise[mask].cpu())
+        aligned_teacher_parts.append(aligned_teacher_surprise[mask].cpu())
         base_parts.append(base_surprise[mask].cpu())
         label_parts.append(labels[mask].cpu())
         candidate_parts.append(candidates[mask].cpu())
 
     teacher_values = torch.cat(teacher_parts)
+    aligned_teacher_values = torch.cat(aligned_teacher_parts)
     base_values = torch.cat(base_parts)
     labels = torch.cat(label_parts).bool()
     candidate_mask = torch.cat(candidate_parts).bool()
     candidate_labels = labels[candidate_mask]
     candidate_teacher = teacher_values[candidate_mask]
+    candidate_aligned_teacher = aligned_teacher_values[candidate_mask]
     candidate_base = base_values[candidate_mask]
 
     all_signals = {
         "external_teacher": signal_summary(teacher_values, labels),
+        "external_teacher_train_aligned": signal_summary(aligned_teacher_values, labels),
         "step2_internal": signal_summary(base_values, labels),
     }
     candidate_signals = {
         "external_teacher": signal_summary(candidate_teacher, candidate_labels),
+        "external_teacher_train_aligned": signal_summary(candidate_aligned_teacher, candidate_labels),
         "step2_internal": signal_summary(candidate_base, candidate_labels),
     }
     correlation = pearson(teacher_values, base_values)
     rank_correlation = pearson(average_ranks(teacher_values), average_ranks(base_values))
-    teacher_increment = candidate_signals["external_teacher"]["auc"] - candidate_signals["step2_internal"]["auc"]
+    teacher_increment = (
+        candidate_signals["external_teacher_train_aligned"]["auc"]
+        - candidate_signals["step2_internal"]["auc"]
+    )
     if correlation >= 0.9 and teacher_increment < 0.01:
         recommendation = (
             "The external teacher is highly redundant with the Step 2 signal. Keep Branch A as the baseline "
             "and move to genuinely new structural evidence rather than expanding this likelihood path."
         )
-    elif candidate_signals["external_teacher"]["auc"] < 0.6:
+    elif candidate_signals["external_teacher_train_aligned"]["auc"] < 0.6:
         recommendation = (
             "The teacher signal is too weak among hard candidates. Improve the clean-music model or its "
             "masking objective before another detector training run."
@@ -303,6 +357,9 @@ def main() -> None:
         "valid_notes": int(labels.numel()),
         "error_notes": int(labels.sum()),
         "teacher_clean_perplexity": math.exp(float(teacher_values[~labels].mean())),
+        "aligned_teacher_clean_perplexity": math.exp(
+            float(aligned_teacher_values[~labels].mean())
+        ),
         "pearson_correlation": correlation,
         "spearman_correlation": rank_correlation,
         "all_notes": all_signals,
