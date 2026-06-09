@@ -1216,3 +1216,28 @@ platform for later stages even though its standalone sparse-error frontier is wo
 - Decision: do not rerun the same bidirectional teacher fusion. Proceed to separately
   trained forward and backward likelihood models, which provide genuinely different
   one-sided evidence.
+
+## 2026-06-09 - Directional Likelihood Training and Leakage Audit
+
+- forward teacher completed 4 epochs:
+  - validation loss `0.6705`
+  - validation perplexity `1.9553`
+  - validation pitch accuracy `0.7717`
+- backward teacher completed 4 epochs:
+  - validation loss `0.6980`
+  - validation perplexity `2.0097`
+  - validation pitch accuracy `0.7522`
+- Audit finding: shifting the full 36-dimensional feature vectors is not sufficient
+  for one-sided prediction. Neighbor-derived fields such as `next_interval`,
+  `step_out`, passing/neighbor flags, and their backward equivalents can encode the
+  target pitch through adjacent notes.
+- Interpretation: the unusually low perplexity is contaminated by target leakage.
+  These checkpoints are implementation diagnostics, not valid Stage 2 evidence.
+- Decision: do not fuse these checkpoints into the detector.
+- Next action:
+  1. rebuild directional inputs from leakage-safe local/raw features;
+  2. retrain forward and backward teachers with early stopping;
+  3. evaluate all-note and hard-candidate separation before any detector run;
+  4. require a meaningful gain over the current hard-candidate AUC `0.5426`;
+  5. if the signal gate passes, run a frozen-Step-2 fusion probe before full Stage 2.
+- Full analysis: `training_logs/directional_likelihood_analysis.md`.
