@@ -1241,3 +1241,21 @@ platform for later stages even though its standalone sparse-error frontier is wo
   4. require a meaningful gain over the current hard-candidate AUC `0.5426`;
   5. if the signal gate passes, run a frozen-Step-2 fusion probe before full Stage 2.
 - Full analysis: `training_logs/directional_likelihood_analysis.md`.
+
+## 2026-06-09 - Leakage-Safe Directional Likelihood Retraining Started
+
+- directional input reduced from all 36 detector features to seven auditable
+  source-note fields: pitch, velocity, duration, onset delta, beat phase, and
+  source-note pitch-class sine/cosine
+- removed all key, scale, harmony, chord, interval, passing/neighbor, resolution,
+  duration-context, and metrical-theory fields from the directional teachers
+- added a runtime invariant test: perturbing a target note's complete feature
+  vector must not change the input used to predict that target
+- retained causal attention and the one-note directional shift
+- changed output names so invalid diagnostic checkpoints are not overwritten:
+  - `checkpoints/transformer_forward_likelihood_leakage_safe.pt`
+  - `checkpoints/transformer_backward_likelihood_leakage_safe.pt`
+- training budget: up to 8 epochs per direction, with validation early stopping
+  patience 2
+- forward and backward smoke tests both passed
+- after training, run the hard-candidate signal Gate before any detector fusion

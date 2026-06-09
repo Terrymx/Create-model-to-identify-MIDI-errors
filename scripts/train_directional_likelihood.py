@@ -11,12 +11,20 @@ from midi_error_detector.data import FEATURE_SIZE, MaestroWrongNoteDataset
 from midi_error_detector.model import build_wrong_note_model
 
 
+# Only fields that describe the source note itself are allowed. All key, chord,
+# interval, passing/neighbor, resolution, and other cross-note features are
+# excluded because they can encode the pitch of the note being predicted.
+DIRECTIONAL_SAFE_FEATURE_COLUMNS = [0, 1, 2, 3, 5, 6, 7]
+DIRECTIONAL_INPUT_SIZE = len(DIRECTIONAL_SAFE_FEATURE_COLUMNS)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train one-sided clean-music pitch likelihood models.")
     parser.add_argument("--data-root", required=True)
     parser.add_argument("--direction", required=True, choices=["forward", "backward"])
     parser.add_argument("--output", required=True)
-    parser.add_argument("--epochs", type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--early-stop-patience", type=int, default=2)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--window-size", type=int, default=256)
     parser.add_argument("--stride", type=int, default=128)
@@ -37,6 +45,7 @@ def directional_batch(
     mask: torch.Tensor,
     direction: str,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    features = features[:, :, DIRECTIONAL_SAFE_FEATURE_COLUMNS]
     if direction == "backward":
         features = features.flip(1)
         targets = targets.flip(1)
@@ -46,6 +55,36 @@ def directional_batch(
     prediction_mask = mask.clone()
     prediction_mask[:, 0] = False
     return shifted, targets, prediction_mask
+
+
+def assert_no_target_feature_leakage(direction: str) -> None:
+    """Changing a target token must not change the input used to predict it."""
+
+    generator = torch.Generator().manual_seed(17)
+    features = torch.randn(2, 12, FEATURE_SIZE, generator=generator)
+    targets = torch.randint(0, 128, (2, 12), generator=generator)
+    mask = torch.ones(2, 12, dtype=torch.bool)
+    baseline, _, prediction_mask = directional_batch(features, targets, mask, direction)
+    oriented = features if direction == "forward" else features.flip(1)
+    expected = oriented[:, :-1, DIRECTIONAL_SAFE_FEATURE_COLUMNS]
+    if not torch.equal(baseline[:, 1:], expected):
+        raise AssertionError(f"{direction} directional shift does not use the expected source note")
+
+    # Compare each prediction position after perturbing its original target only.
+    for target_index in range(1, features.shape[1] - 1):
+        single_change = features.clone()
+        single_change[:, target_index] = torch.randn(
+            single_change[:, target_index].shape,
+            generator=generator,
+            dtype=single_change.dtype,
+        )
+        changed_inputs, _, _ = directional_batch(single_change, targets, mask, direction)
+        model_index = target_index if direction == "forward" else features.shape[1] - 1 - target_index
+        if prediction_mask[:, model_index].all() and not torch.equal(
+            baseline[:, model_index],
+            changed_inputs[:, model_index],
+        ):
+            raise AssertionError(f"{direction} target feature leakage at note {target_index}")
 
 
 def run_epoch(
@@ -88,8 +127,13 @@ def run_epoch(
 
 def main() -> None:
     args = parse_args()
+    assert_no_target_feature_leakage(args.direction)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"device={device} direction={args.direction}", flush=True)
+    print(
+        f"device={device} direction={args.direction} "
+        f"safe_feature_columns={DIRECTIONAL_SAFE_FEATURE_COLUMNS}",
+        flush=True,
+    )
     train_dataset = MaestroWrongNoteDataset(
         root=args.data_root,
         split="train",
@@ -126,7 +170,7 @@ def main() -> None:
     )
     model = build_wrong_note_model(
         model_type="transformer",
-        input_size=FEATURE_SIZE,
+        input_size=DIRECTIONAL_INPUT_SIZE,
         num_layers=args.num_layers,
         transformer_d_model=args.d_model,
         transformer_heads=args.heads,
@@ -135,6 +179,7 @@ def main() -> None:
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     best_loss = float("inf")
+    epochs_without_improvement = 0
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     for epoch in range(1, args.epochs + 1):
@@ -165,11 +210,17 @@ def main() -> None:
         )
         if validation_loss < best_loss:
             best_loss = validation_loss
+            epochs_without_improvement = 0
             torch.save(
                 {
                     "model_state_dict": model.state_dict(),
-                    "args": vars(args) | {"model": "transformer", "input_size": FEATURE_SIZE},
-                    "stage": f"{args.direction}_likelihood",
+                    "args": vars(args)
+                    | {
+                        "model": "transformer",
+                        "input_size": DIRECTIONAL_INPUT_SIZE,
+                        "safe_feature_columns": DIRECTIONAL_SAFE_FEATURE_COLUMNS,
+                    },
+                    "stage": f"{args.direction}_likelihood_leakage_safe",
                     "epoch": epoch,
                     "validation_loss": validation_loss,
                     "validation_accuracy": validation_accuracy,
@@ -177,6 +228,14 @@ def main() -> None:
                 output,
             )
             print(f"saved {output} validation_loss={validation_loss:.6f}", flush=True)
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= args.early_stop_patience:
+                print(
+                    f"early_stop epoch={epoch} best_validation_loss={best_loss:.6f}",
+                    flush=True,
+                )
+                break
 
 
 if __name__ == "__main__":
