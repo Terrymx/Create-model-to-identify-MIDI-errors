@@ -5,7 +5,7 @@ param(
     [string]$Python = "python"
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $env:PYTHONPATH = "src"
 $env:PYTHONDONTWRITEBYTECODE = "1"
 
