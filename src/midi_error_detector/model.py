@@ -45,6 +45,7 @@ class BiGRUWrongNoteModel(nn.Module):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
+        self.correction_evidence_dim = correction_evidence_dim
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         recurrent_dropout = dropout if num_layers > 1 else 0.0
@@ -101,7 +102,7 @@ class BiGRUWrongNoteModel(nn.Module):
                 raise RuntimeError("correction projection is not initialized")
             if correction_evidence is None:
                 correction_evidence = torch.zeros(
-                    (*features.shape[:2], 7),
+                    (*features.shape[:2], self.correction_evidence_dim),
                     dtype=features.dtype,
                     device=features.device,
                 )
@@ -147,6 +148,7 @@ class TransformerWrongNoteModel(nn.Module):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
+        self.correction_evidence_dim = correction_evidence_dim
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         self.input_projection = nn.Linear(input_size, d_model)
@@ -219,7 +221,7 @@ class TransformerWrongNoteModel(nn.Module):
                 raise RuntimeError("correction projection is not initialized")
             if correction_evidence is None:
                 correction_evidence = torch.zeros(
-                    (*features.shape[:2], 7),
+                    (*features.shape[:2], self.correction_evidence_dim),
                     dtype=features.dtype,
                     device=features.device,
                 )

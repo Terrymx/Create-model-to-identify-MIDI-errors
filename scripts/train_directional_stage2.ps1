@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$DataRoot,
 
-    [string]$Python = "python"
+    [string]$Python = "python",
+
+    [switch]$SkipWarmup
 )
 
 $ErrorActionPreference = "Continue"
@@ -50,23 +52,25 @@ $shared = @(
     "--num-workers", "0"
 )
 
-& $Python @shared `
-    --init-checkpoint "checkpoints\transformer_explicit_surprise_step2.pt" `
-    --freeze-detector-backbone `
-    --epochs 8 `
-    --early-stop-patience 4 `
-    --masked-pitch-loss-weight 0 `
-    --clean-mask-batches-per-epoch 0 `
-    --lr 0.001 `
-    --lr-patience 2 `
-    --lr-factor 0.5 `
-    --lr-threshold 0.001 `
-    --output "checkpoints\transformer_directional_stage2_warmup.pt" `
-    1> "training_logs\directional_stage2_warmup.log" `
-    2> "training_logs\directional_stage2_warmup.err.log"
+if (-not $SkipWarmup) {
+    & $Python @shared `
+        --init-checkpoint "checkpoints\transformer_explicit_surprise_step2.pt" `
+        --freeze-detector-backbone `
+        --epochs 8 `
+        --early-stop-patience 4 `
+        --masked-pitch-loss-weight 0 `
+        --clean-mask-batches-per-epoch 0 `
+        --lr 0.001 `
+        --lr-patience 2 `
+        --lr-factor 0.5 `
+        --lr-threshold 0.001 `
+        --output "checkpoints\transformer_directional_stage2_warmup.pt" `
+        1> "training_logs\directional_stage2_warmup.log" `
+        2> "training_logs\directional_stage2_warmup.err.log"
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Directional Stage 2 warm-up failed with exit code $LASTEXITCODE"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Directional Stage 2 warm-up failed with exit code $LASTEXITCODE"
+    }
 }
 
 & $Python @shared `
