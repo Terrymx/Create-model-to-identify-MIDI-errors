@@ -1339,3 +1339,67 @@ Decision:
 - result files:
   - `training_logs/directional_likelihood_gate.json`
   - `training_logs/directional_likelihood_gate.md`
+
+## 2026-06-10 - Frozen Step 2 Directional Fusion Probe
+
+Protocol:
+
+- Step 2 detector backbone and both directional likelihood teachers frozen
+- Stage 1 candidate threshold `0.45`
+- validation MIDI files split into 103 fusion-training files and 34 calibration
+  files
+- test split used only after selecting the fusion epoch and threshold
+- fusion head inputs:
+  - frozen Step 2 hidden state and explicit-surprise embedding
+  - original Step 2 probability/logit/surprise
+  - forward and backward observed probability, top probability, probability gap,
+    entropy, mismatch, and surprise
+  - directional mean/minimum/maximum surprise
+- each epoch evaluated on calibration files; epoch selected by recall at precision
+  `>=0.80`
+
+Candidate coverage:
+
+- fusion train recall ceiling: `0.6722`
+- calibration recall ceiling: `0.6641`
+- test recall ceiling: `0.7176`
+
+Result:
+
+- best fusion epoch: `10`
+- Step 2 calibration-selected baseline on test:
+  - threshold `0.85`
+  - precision `0.8023`
+  - recall `0.5328`
+  - F1 `0.6404`
+- calibration-selected fusion threshold `0.41`:
+  - calibration precision `0.8003`, recall `0.5114`
+  - test precision `0.7927`, recall `0.5752`
+- adjacent test diagnostic point satisfying precision `>=0.80`:
+  - threshold `0.43`
+  - precision `0.8024`
+  - recall `0.5658`
+  - F1 `0.6636`
+- recall gain over historical Step 2: `+0.0351`
+- required Gate gain: `+0.0300`
+- Gate result: **passed**
+
+Interpretation:
+
+- directional evidence translates into a meaningful PR-frontier improvement
+- selecting the fusion epoch on file-held-out calibration is necessary; using the
+  final epoch reduced the gain to nearly zero
+- calibration-to-test precision drift remains, so the final product threshold
+  will need a safety margin above `0.80`
+
+Decision:
+
+- proceed to full Stage 2 detector training
+- initialize from the Step 2 detector
+- freeze the forward/backward likelihood teachers
+- train the detector with combined internal and directional evidence, curriculum,
+  and FN-heavy asymmetric hard replay
+- files:
+  - `scripts/run_directional_fusion_probe.py`
+  - `training_logs/directional_fusion_probe.json`
+  - `training_logs/directional_fusion_probe.md`
