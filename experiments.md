@@ -1259,3 +1259,24 @@ platform for later stages even though its standalone sparse-error frontier is wo
   patience 2
 - forward and backward smoke tests both passed
 - after training, run the hard-candidate signal Gate before any detector fusion
+
+## 2026-06-10 - Leakage-Safe Directional Likelihood Result
+
+- both directional teachers completed all 8 epochs without errors or early stopping
+- forward teacher best epoch 8:
+  - validation loss `2.4721`
+  - validation perplexity `11.8471`
+  - validation pitch accuracy `0.3538`
+- backward teacher best epoch 8:
+  - validation loss `2.3574`
+  - validation perplexity `10.5638`
+  - validation pitch accuracy `0.3684`
+- both validation curves were still improving at epoch 8
+- the backward teacher is modestly stronger than the forward teacher
+- unlike the invalid full-feature run with perplexity near `2.0`, these values are
+  plausible for one-sided pitch prediction and pass the leakage audit
+- interpretation: clean one-sided sequence modeling is viable, but likelihood
+  quality alone does not establish wrong-note detection value
+- next action: evaluate forward, backward, combined, and disagreement surprise on
+  all notes and on Step 2 hard candidates; do not fuse into the detector unless the
+  hard-candidate signal Gate passes
