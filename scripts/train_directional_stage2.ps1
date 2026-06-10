@@ -1,0 +1,89 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$DataRoot,
+
+    [string]$Python = "python"
+)
+
+$ErrorActionPreference = "Stop"
+$env:PYTHONPATH = "src"
+$env:PYTHONDONTWRITEBYTECODE = "1"
+
+$shared = @(
+    "-B", "-u", "-m", "midi_error_detector.train",
+    "--model", "transformer",
+    "--explicit-correction-evidence",
+    "--directional-forward-checkpoint", "checkpoints\transformer_forward_likelihood_leakage_safe.pt",
+    "--directional-backward-checkpoint", "checkpoints\transformer_backward_likelihood_leakage_safe.pt",
+    "--data-root", $DataRoot,
+    "--eval-split", "validation",
+    "--clean-epochs", "0",
+    "--batch-size", "8",
+    "--window-size", "256",
+    "--num-layers", "4",
+    "--transformer-d-model", "192",
+    "--transformer-heads", "4",
+    "--transformer-ffn-dim", "512",
+    "--correction-embedding-dim", "32",
+    "--correction-evidence-groups", "4",
+    "--curriculum-error-rate-stages", "0.08,0.12;0.02,0.05,0.08;0.005,0.01,0.02",
+    "--error-rate", "0.01",
+    "--det-threshold", "0.70",
+    "--det-pos-weight", "2.3",
+    "--clean-theory-weight", "1.5",
+    "--error-theory-weight", "1.5",
+    "--pitch-loss-weight", "0",
+    "--kind-loss-weight", "0",
+    "--ranking-loss-weight", "0.06",
+    "--ranking-margin", "0.65",
+    "--ranking-top-k", "64",
+    "--hard-replay-size", "512",
+    "--hard-replay-epochs", "1",
+    "--asymmetric-hard-replay",
+    "--fn-replay-fraction", "0.75",
+    "--fn-replay-weight", "1.5",
+    "--fp-replay-weight", "0.4",
+    "--target-precision", "0.8",
+    "--kind-class-weights", "1", "6", "4",
+    "--threshold-sweep", "0.35", "0.4", "0.45", "0.5", "0.55", "0.6", "0.65", "0.7", "0.75", "0.8", "0.85", "0.9", "0.93", "0.95",
+    "--save-metric", "precision_recall_score",
+    "--num-workers", "0"
+)
+
+& $Python @shared `
+    --init-checkpoint "checkpoints\transformer_explicit_surprise_step2.pt" `
+    --freeze-detector-backbone `
+    --epochs 8 `
+    --early-stop-patience 4 `
+    --masked-pitch-loss-weight 0 `
+    --clean-mask-batches-per-epoch 0 `
+    --lr 0.001 `
+    --lr-patience 2 `
+    --lr-factor 0.5 `
+    --lr-threshold 0.001 `
+    --output "checkpoints\transformer_directional_stage2_warmup.pt" `
+    1> "training_logs\directional_stage2_warmup.log" `
+    2> "training_logs\directional_stage2_warmup.err.log"
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Directional Stage 2 warm-up failed with exit code $LASTEXITCODE"
+}
+
+& $Python @shared `
+    --init-checkpoint "checkpoints\transformer_directional_stage2_warmup.pt" `
+    --epochs 28 `
+    --early-stop-patience 8 `
+    --masked-pitch-loss-weight 0.35 `
+    --masked-pitch-rate 0.18 `
+    --clean-mask-batches-per-epoch 900 `
+    --lr 0.0001 `
+    --lr-patience 4 `
+    --lr-factor 0.5 `
+    --lr-threshold 0.001 `
+    --output "checkpoints\transformer_directional_stage2.pt" `
+    1> "training_logs\directional_stage2.log" `
+    2> "training_logs\directional_stage2.err.log"
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Directional Stage 2 full training failed with exit code $LASTEXITCODE"
+}

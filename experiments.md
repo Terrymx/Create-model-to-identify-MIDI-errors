@@ -1403,3 +1403,36 @@ Decision:
   - `scripts/run_directional_fusion_probe.py`
   - `training_logs/directional_fusion_probe.json`
   - `training_logs/directional_fusion_probe.md`
+
+## 2026-06-10 - Full Directional Stage 2 Training Started
+
+Architecture:
+
+- initialize the detector backbone from `transformer_explicit_surprise_step2.pt`
+- replace the scalar surprise branch with a 17-value explicit evidence branch:
+  - internal masked-context surprise and availability
+  - six forward likelihood values
+  - six backward likelihood values
+  - directional mean, minimum, and maximum surprise
+- freeze both directional likelihood teachers
+- initialize new error-head evidence columns to zero so the starting detector score
+  exactly preserves the Step 2 backbone before evidence learning
+
+Schedule:
+
+1. 8-epoch evidence warm-up:
+   - freeze detector backbone
+   - train only correction projection and error head
+   - learning rate `0.001`
+2. up to 28-epoch full fine-tuning:
+   - unfreeze detector
+   - learning rate `0.0001`
+   - retain clean masked reconstruction, three-stage corruption curriculum, and
+     FN-heavy asymmetric hard replay
+
+Evaluation:
+
+- checkpoint selection uses MAESTRO validation, not test
+- sparse validation error rate remains `0.01`
+- target metric remains recall at precision `>=0.80`
+- test is reserved for evaluation after model selection

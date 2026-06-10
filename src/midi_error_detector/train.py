@@ -40,6 +40,8 @@ PITCH_CONTEXT_FEATURE_COLUMNS = [
     32,
 ]
 PITCH_LEAKAGE_FEATURE_COLUMNS = [4, 15, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+DIRECTIONAL_SAFE_FEATURE_COLUMNS = [0, 1, 2, 3, 5, 6, 7]
+DIRECTIONAL_CORRECTION_EVIDENCE_DIM = 17
 
 
 def load_compatible_state_dict(
@@ -77,6 +79,7 @@ def load_compatible_state_dict(
             cols = min(model_value.shape[1], checkpoint_value.shape[1])
             if error_head_copy_columns is not None:
                 cols = min(cols, error_head_copy_columns)
+                copied[:, cols:] = 0.0
             copied[:rows, :cols] = checkpoint_value[:rows, :cols]
             adapted_state[name] = copied
             partial.append(f"{name} old={tuple(checkpoint_value.shape)} new={tuple(model_value.shape)} copied_cols={cols}")
@@ -236,6 +239,112 @@ def build_explicit_correction_evidence(
         surprise = torch.where(selected, observed_surprise, surprise)
         available |= selected
     return evidence, surprise, available.float()
+
+
+@torch.no_grad()
+def build_directional_pitch_evidence(
+    model: torch.nn.Module,
+    features: torch.Tensor,
+    mask: torch.Tensor,
+    direction: str,
+    safe_feature_columns: list[int],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build one-sided pitch evidence without target or cross-note feature leakage."""
+
+    directional_features = features[:, :, safe_feature_columns]
+    observed_pitch = torch.round(features[:, :, 0] * 127.0).long().clamp(0, 127)
+    valid = mask.bool()
+    if direction == "backward":
+        directional_features = directional_features.flip(1)
+        observed_pitch = observed_pitch.flip(1)
+        valid = valid.flip(1)
+    shifted = torch.zeros_like(directional_features)
+    shifted[:, 1:] = directional_features[:, :-1]
+    available = valid.clone()
+    available[:, 0] = False
+    pitch_probability = torch.softmax(model.predict_pitch(shifted, causal=True), dim=-1)
+    observed_probability = pitch_probability.gather(-1, observed_pitch.unsqueeze(-1)).squeeze(-1)
+    top_probability, top_pitch = pitch_probability.max(dim=-1)
+    surprise = -observed_probability.clamp_min(1e-9).log()
+    entropy = -(pitch_probability * pitch_probability.clamp_min(1e-9).log()).sum(dim=-1)
+    evidence = torch.stack(
+        [
+            surprise.clamp(0.0, 12.0) / 12.0,
+            observed_probability,
+            top_probability,
+            (top_probability - observed_probability).clamp(0.0, 1.0),
+            entropy / torch.log(torch.tensor(128.0, device=features.device)),
+            (top_pitch != observed_pitch).float(),
+        ],
+        dim=-1,
+    )
+    if direction == "backward":
+        evidence = evidence.flip(1)
+        available = available.flip(1)
+    return evidence, available
+
+
+def build_combined_directional_evidence(
+    detector: torch.nn.Module,
+    forward_model: torch.nn.Module,
+    backward_model: torch.nn.Module,
+    features: torch.Tensor,
+    mask: torch.Tensor,
+    groups: int,
+    forward_columns: list[int],
+    backward_columns: list[int],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Combine Step 2 masked surprise with frozen forward/backward likelihood evidence."""
+
+    internal_surprise, internal_available = build_explicit_surprise(
+        detector,
+        features,
+        mask,
+        training=False,
+        train_mask_rate=0.0,
+        eval_groups=groups,
+    )
+    forward, forward_available = build_directional_pitch_evidence(
+        forward_model,
+        features,
+        mask,
+        "forward",
+        forward_columns,
+    )
+    backward, backward_available = build_directional_pitch_evidence(
+        backward_model,
+        features,
+        mask,
+        "backward",
+        backward_columns,
+    )
+    forward_surprise = forward[..., 0]
+    backward_surprise = backward[..., 0]
+    combined_available = internal_available.bool() & forward_available & backward_available
+    evidence = torch.cat(
+        [
+            torch.stack(
+                [
+                    internal_surprise.clamp(0.0, 12.0) / 12.0,
+                    internal_available.float(),
+                ],
+                dim=-1,
+            ),
+            forward,
+            backward,
+            torch.stack(
+                [
+                    0.5 * (forward_surprise + backward_surprise),
+                    torch.minimum(forward_surprise, backward_surprise),
+                    torch.maximum(forward_surprise, backward_surprise),
+                ],
+                dim=-1,
+            ),
+        ],
+        dim=-1,
+    )
+    evidence = evidence * combined_available.unsqueeze(-1)
+    return evidence, internal_surprise, combined_available.float()
 
 
 def parse_error_rate_stages(raw_stages: str | None) -> list[list[float]] | None:
@@ -432,6 +541,16 @@ def parse_args() -> argparse.Namespace:
         help="Optional frozen clean-music checkpoint used to generate correction evidence.",
     )
     parser.add_argument(
+        "--directional-forward-checkpoint",
+        default=None,
+        help="Frozen leakage-safe forward likelihood checkpoint for Stage 2 evidence.",
+    )
+    parser.add_argument(
+        "--directional-backward-checkpoint",
+        default=None,
+        help="Frozen leakage-safe backward likelihood checkpoint for Stage 2 evidence.",
+    )
+    parser.add_argument(
         "--freeze-detector-backbone",
         action="store_true",
         help="Train only the explicit evidence projection and detection head.",
@@ -562,6 +681,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=32,
         help="Projection width for explicit correction evidence before the detection head.",
+    )
+    parser.add_argument(
+        "--correction-evidence-dim",
+        type=int,
+        default=7,
+        help="Number of explicit correction evidence values supplied to the projection.",
     )
     parser.add_argument(
         "--allow-detector-evidence-grad",
@@ -771,12 +896,22 @@ def run_epoch(
     correction_evidence_groups: int = 4,
     allow_detector_evidence_grad: bool = False,
     evidence_model: torch.nn.Module | None = None,
+    directional_models: tuple[
+        torch.nn.Module,
+        list[int],
+        torch.nn.Module,
+        list[int],
+    ]
+    | None = None,
     max_batches: int | None = None,
 ) -> dict[str, float]:
     training = optimizer is not None
     model.train(training)
     if evidence_model is not None:
         evidence_model.eval()
+    if directional_models is not None:
+        directional_models[0].eval()
+        directional_models[2].eval()
     totals = {
         "loss": 0.0,
         "det_loss": 0.0,
@@ -822,19 +957,33 @@ def run_epoch(
 
         with torch.set_grad_enabled(training):
             if explicit_correction_evidence and det_loss_weight > 0.0:
-                evidence_source = evidence_model if evidence_model is not None else model
-                evidence_grad_enabled = (
-                    training
-                    and evidence_model is None
-                    and allow_detector_evidence_grad
-                )
-                with torch.set_grad_enabled(evidence_grad_enabled):
-                    correction_evidence, surprise, surprise_available = build_explicit_correction_evidence(
-                        evidence_source,
-                        features,
-                        mask,
-                        groups=correction_evidence_groups,
+                if directional_models is not None:
+                    forward_model, forward_columns, backward_model, backward_columns = directional_models
+                    with torch.no_grad():
+                        correction_evidence, surprise, surprise_available = build_combined_directional_evidence(
+                            model,
+                            forward_model,
+                            backward_model,
+                            features,
+                            mask,
+                            groups=correction_evidence_groups,
+                            forward_columns=forward_columns,
+                            backward_columns=backward_columns,
+                        )
+                else:
+                    evidence_source = evidence_model if evidence_model is not None else model
+                    evidence_grad_enabled = (
+                        training
+                        and evidence_model is None
+                        and allow_detector_evidence_grad
                     )
+                    with torch.set_grad_enabled(evidence_grad_enabled):
+                        correction_evidence, surprise, surprise_available = build_explicit_correction_evidence(
+                            evidence_source,
+                            features,
+                            mask,
+                            groups=correction_evidence_groups,
+                        )
                 if not allow_detector_evidence_grad:
                     correction_evidence = correction_evidence.detach()
                 outputs = model(features, correction_evidence=correction_evidence)
@@ -1074,6 +1223,15 @@ def main() -> None:
     args = parse_args()
     if args.explicit_surprise and args.explicit_correction_evidence:
         raise ValueError("--explicit-surprise and --explicit-correction-evidence are mutually exclusive")
+    directional_requested = bool(
+        args.directional_forward_checkpoint or args.directional_backward_checkpoint
+    )
+    if directional_requested:
+        if not args.directional_forward_checkpoint or not args.directional_backward_checkpoint:
+            raise ValueError("Both directional likelihood checkpoints are required")
+        if not args.explicit_correction_evidence:
+            raise ValueError("Directional likelihood checkpoints require --explicit-correction-evidence")
+        args.correction_evidence_dim = DIRECTIONAL_CORRECTION_EVIDENCE_DIM
     curriculum_error_rate_stages = parse_error_rate_stages(args.curriculum_error_rate_stages)
     if not 0.0 <= args.fn_replay_fraction <= 1.0:
         raise ValueError("--fn-replay-fraction must be between 0 and 1")
@@ -1097,6 +1255,7 @@ def main() -> None:
         explicit_surprise=args.explicit_surprise,
         explicit_correction_evidence=args.explicit_correction_evidence,
         surprise_embedding_dim=args.surprise_embedding_dim,
+        correction_evidence_dim=args.correction_evidence_dim,
         correction_embedding_dim=args.correction_embedding_dim,
     ).to(device)
     if args.init_checkpoint:
@@ -1149,6 +1308,58 @@ def main() -> None:
             f"stage={evidence_checkpoint.get('stage')} epoch={evidence_checkpoint.get('epoch')}",
             flush=True,
         )
+    directional_models = None
+    if directional_requested:
+        loaded_directional: list[tuple[torch.nn.Module, list[int]]] = []
+        for direction, checkpoint_path in (
+            ("forward", args.directional_forward_checkpoint),
+            ("backward", args.directional_backward_checkpoint),
+        ):
+            directional_checkpoint = torch.load(checkpoint_path, map_location=device)
+            directional_args = directional_checkpoint.get("args", {})
+            safe_columns = list(
+                directional_args.get(
+                    "safe_feature_columns",
+                    DIRECTIONAL_SAFE_FEATURE_COLUMNS,
+                )
+            )
+            directional_model = build_wrong_note_model(
+                model_type=directional_args.get("model", "transformer"),
+                input_size=directional_args.get("input_size", len(safe_columns)),
+                hidden_size=directional_args.get("hidden_size", 256),
+                num_layers=directional_args.get("num_layers", 4),
+                transformer_d_model=directional_args.get(
+                    "d_model",
+                    directional_args.get("transformer_d_model", 192),
+                ),
+                transformer_heads=directional_args.get(
+                    "heads",
+                    directional_args.get("transformer_heads", 4),
+                ),
+                transformer_ffn_dim=directional_args.get(
+                    "ffn_dim",
+                    directional_args.get("transformer_ffn_dim", 512),
+                ),
+                dropout=directional_args.get("dropout", 0.15),
+            ).to(device)
+            directional_model.load_state_dict(directional_checkpoint["model_state_dict"])
+            directional_model.eval()
+            for parameter in directional_model.parameters():
+                parameter.requires_grad = False
+            loaded_directional.append((directional_model, safe_columns))
+            print(
+                f"loaded frozen {direction} likelihood checkpoint={checkpoint_path} "
+                f"stage={directional_checkpoint.get('stage')} "
+                f"epoch={directional_checkpoint.get('epoch')} "
+                f"safe_columns={safe_columns}",
+                flush=True,
+            )
+        directional_models = (
+            loaded_directional[0][0],
+            loaded_directional[0][1],
+            loaded_directional[1][0],
+            loaded_directional[1][1],
+        )
     if args.freeze_detector_backbone:
         if not args.explicit_correction_evidence:
             raise ValueError("--freeze-detector-backbone requires --explicit-correction-evidence")
@@ -1190,6 +1401,8 @@ def main() -> None:
         f"explicit_correction_evidence={args.explicit_correction_evidence}, "
         f"correction_evidence_groups={args.correction_evidence_groups}, "
         f"correction_embedding_dim={args.correction_embedding_dim}, "
+        f"correction_evidence_dim={args.correction_evidence_dim}, "
+        f"directional_evidence={directional_models is not None}, "
         f"allow_detector_evidence_grad={args.allow_detector_evidence_grad}, "
         f"ranking_margin={args.ranking_margin}, ranking_top_k={args.ranking_top_k}, "
         f"hard_replay_size={args.hard_replay_size}, hard_replay_epochs={args.hard_replay_epochs}, "
@@ -1350,6 +1563,7 @@ def main() -> None:
                     correction_evidence_groups=args.correction_evidence_groups,
                     allow_detector_evidence_grad=args.allow_detector_evidence_grad,
                     evidence_model=evidence_model,
+                    directional_models=directional_models,
                 )
                 print(
                     f"stage=hard_replay epoch={epoch}/{args.epochs} replay_epoch={replay_epoch}/"
@@ -1398,6 +1612,7 @@ def main() -> None:
             correction_evidence_groups=args.correction_evidence_groups,
             allow_detector_evidence_grad=args.allow_detector_evidence_grad,
             evidence_model=evidence_model,
+            directional_models=directional_models,
         )
         if args.asymmetric_hard_replay:
             previous_hard_replay = select_asymmetric_replay_samples(
@@ -1445,6 +1660,7 @@ def main() -> None:
             correction_evidence_groups=args.correction_evidence_groups,
             allow_detector_evidence_grad=args.allow_detector_evidence_grad,
             evidence_model=evidence_model,
+            directional_models=directional_models,
         )
         print(f"stage=corrupt epoch={epoch}/{args.epochs} train={train_metrics} {args.eval_split}={valid_metrics}", flush=True)
         improved = save_if_best("corrupt", epoch, valid_metrics)
