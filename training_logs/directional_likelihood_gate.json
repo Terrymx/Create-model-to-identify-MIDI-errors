@@ -1,0 +1,150 @@
+{
+  "forward_checkpoint": "checkpoints\\transformer_forward_likelihood_leakage_safe.pt",
+  "backward_checkpoint": "checkpoints\\transformer_backward_likelihood_leakage_safe.pt",
+  "detector_checkpoint": "checkpoints\\transformer_explicit_surprise_step2.pt",
+  "eval_split": "validation",
+  "error_rate": 0.01,
+  "valid_notes": 1251966,
+  "error_notes": 14102,
+  "all_notes": {
+    "forward": {
+      "auc": 0.8495156118052805,
+      "clean_mean": 2.4918594360351562,
+      "error_mean": 5.0126519203186035,
+      "mean_gap": 2.5207924842834473,
+      "js_divergence": 0.21480206116178885
+    },
+    "backward": {
+      "auc": 0.8617925826618903,
+      "clean_mean": 2.3772900104522705,
+      "error_mean": 5.233668804168701,
+      "mean_gap": 2.8563787937164307,
+      "js_divergence": 0.2316182571826708
+    },
+    "directional_mean": {
+      "auc": 0.91013540705356,
+      "clean_mean": 2.434574842453003,
+      "error_mean": 5.123160362243652,
+      "mean_gap": 2.6885855197906494,
+      "js_divergence": 0.3145290315456928
+    },
+    "directional_min": {
+      "auc": 0.9062123692699713,
+      "clean_mean": 1.5530633926391602,
+      "error_mean": 4.273870944976807,
+      "mean_gap": 2.7208075523376465,
+      "js_divergence": 0.30560528573165646
+    },
+    "directional_max": {
+      "auc": 0.868265327129636,
+      "clean_mean": 3.3160860538482666,
+      "error_mean": 5.972449779510498,
+      "mean_gap": 2.6563637256622314,
+      "js_divergence": 0.24281126269086295
+    },
+    "directional_disagreement": {
+      "auc": 0.48933174702681603,
+      "clean_mean": 1.763023018836975,
+      "error_mean": 1.6985785961151123,
+      "mean_gap": -0.06444442272186279,
+      "js_divergence": 0.0010792889780543292
+    },
+    "step2_internal": {
+      "auc": 0.7867779527546594,
+      "clean_mean": 2.8230702877044678,
+      "error_mean": 6.616637229919434,
+      "mean_gap": 3.793566942214966,
+      "js_divergence": 0.13500545074174503
+    }
+  },
+  "candidates": {
+    "threshold": 0.55,
+    "count": 14695,
+    "precision": 0.6081660389900208,
+    "recall_ceiling": 0.6337398886680603,
+    "signals": {
+      "forward": {
+        "auc": 0.6161792285102662,
+        "clean_mean": 4.736486434936523,
+        "error_mean": 5.477245330810547,
+        "mean_gap": 0.7407588958740234,
+        "js_divergence": 0.026436376856610017
+      },
+      "backward": {
+        "auc": 0.6381873823024924,
+        "clean_mean": 4.812281608581543,
+        "error_mean": 5.784749984741211,
+        "mean_gap": 0.972468376159668,
+        "js_divergence": 0.033386137659565246
+      },
+      "directional_mean": {
+        "auc": 0.6632513426255798,
+        "clean_mean": 4.774384021759033,
+        "error_mean": 5.630997657775879,
+        "mean_gap": 0.8566136360168457,
+        "js_divergence": 0.04550116829944885
+      },
+      "directional_min": {
+        "auc": 0.6562291546207265,
+        "clean_mean": 3.859921455383301,
+        "error_mean": 4.763774871826172,
+        "mean_gap": 0.9038534164428711,
+        "js_divergence": 0.04348910525433615
+      },
+      "directional_max": {
+        "auc": 0.6369956333989036,
+        "clean_mean": 5.688846588134766,
+        "error_mean": 6.498219966888428,
+        "mean_gap": 0.8093733787536621,
+        "js_divergence": 0.03296503265948613
+      },
+      "directional_disagreement": {
+        "auc": 0.483774286160353,
+        "clean_mean": 1.8289248943328857,
+        "error_mean": 1.7344461679458618,
+        "mean_gap": -0.09447872638702393,
+        "js_divergence": 0.0036547925024380716
+      },
+      "step2_internal": {
+        "auc": 0.5428209538864989,
+        "clean_mean": 6.938209533691406,
+        "error_mean": 7.532442569732666,
+        "mean_gap": 0.5942330360412598,
+        "js_divergence": 0.00620436114304927
+      }
+    }
+  },
+  "correlations": {
+    "forward": {
+      "pearson_with_step2": 0.21178778726215433,
+      "spearman_with_step2": 0.20925833982796072
+    },
+    "backward": {
+      "pearson_with_step2": 0.23290899640658796,
+      "spearman_with_step2": 0.23553065155806835
+    },
+    "directional_mean": {
+      "pearson_with_step2": 0.29153877769765923,
+      "spearman_with_step2": 0.28763388885783303
+    },
+    "directional_min": {
+      "pearson_with_step2": 0.27416232923189393,
+      "spearman_with_step2": 0.26025166718898135
+    },
+    "directional_max": {
+      "pearson_with_step2": 0.24766218628454012,
+      "spearman_with_step2": 0.25361041242963833
+    },
+    "directional_disagreement": {
+      "pearson_with_step2": 0.0381996480066844,
+      "spearman_with_step2": 0.03773515145221564
+    }
+  },
+  "baseline_candidate_auc": 0.5428209538864989,
+  "best_directional_signal": "directional_mean",
+  "best_directional_candidate_auc": 0.6632513426255798,
+  "gate_increment": 0.02,
+  "gate_target_auc": 0.5628209538864989,
+  "gate_passed": true,
+  "recommendation": "The directional evidence passes the hard-candidate separation Gate. Proceed to a frozen-Step-2 fusion probe before full detector retraining."
+}

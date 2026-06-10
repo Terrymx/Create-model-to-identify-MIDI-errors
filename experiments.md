@@ -1280,3 +1280,62 @@ platform for later stages even though its standalone sparse-error frontier is wo
 - next action: evaluate forward, backward, combined, and disagreement surprise on
   all notes and on Step 2 hard candidates; do not fuse into the detector unless the
   hard-candidate signal Gate passes
+
+## 2026-06-10 - Directional Likelihood Signal Gate
+
+- evaluation split: MAESTRO validation
+- sparse synthetic error rate: `0.01`
+- valid notes with both directions: `1,251,966`
+- error notes: `14,102`
+- Step 2 candidate threshold: `0.55`
+- candidate count: `14,695`
+- candidate precision: `0.6082`
+- candidate recall ceiling: `0.6337`
+
+All-note AUC:
+
+- forward surprise: `0.8495`
+- backward surprise: `0.8618`
+- directional mean: `0.9101`
+- directional minimum: `0.9062`
+- Step 2 internal surprise: `0.7868`
+
+Hard-candidate TP/FP AUC:
+
+- forward surprise: `0.6162`
+- backward surprise: `0.6382`
+- directional mean: `0.6633`
+- directional minimum: `0.6562`
+- directional maximum: `0.6370`
+- directional disagreement: `0.4838`
+- Step 2 internal surprise: `0.5428`
+
+Complementarity:
+
+- directional mean Pearson correlation with Step 2 surprise: `0.2915`
+- directional mean Spearman correlation with Step 2 surprise: `0.2876`
+- best directional AUC increment over Step 2: `+0.1204`
+- required Gate increment: `+0.0200`
+- Gate result: **passed**
+
+Interpretation:
+
+- leakage-safe forward/backward likelihood provides substantially stronger ranking
+  among the false-positive-heavy candidate population
+- the low correlation with Step 2 confirms that the gain is not merely another
+  rescaling of the existing masked-context surprise
+- backward context is stronger than forward context, while their mean is better
+  than either direction alone
+- disagreement by itself is not useful
+
+Decision:
+
+- proceed to a frozen-Step-2 fusion probe
+- keep the Step 2 Transformer backbone and directional teachers frozen
+- train only a compact evidence projection plus detection head
+- feed forward/backward probabilities, surprises, entropy/top-alternative evidence,
+  and their mean/minimum
+- require at least `+0.03` recall at precision `>=0.80` before a full Stage 2 run
+- result files:
+  - `training_logs/directional_likelihood_gate.json`
+  - `training_logs/directional_likelihood_gate.md`
