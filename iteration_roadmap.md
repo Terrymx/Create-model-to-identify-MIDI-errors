@@ -191,6 +191,21 @@ Step 2 model rather than the weaker from-scratch explicit-correction branch.
 Select the variant with the highest validation recall at precision `>= 0.80`. Then
 evaluate both selected checkpoints once on the same test split.
 
+### Gate 1.5 - Likelihood Teacher Quality Diagnostic
+
+Before expanding the system, measure whether the frozen forward/backward teachers
+provide the signal needed by later stages. On piece-held-out validation data, compare
+the teacher-surprise distributions for:
+
+- synthetic wrong notes
+- clean chord tones
+- clean passing and neighbor tones
+
+Report distribution plots, pairwise AUC, KL divergence or another robust separation
+measure, and forward/backward disagreement. If clean ornamental notes overlap heavily
+with synthetic errors, treat theory-aware ornament modeling as a required correction,
+not an optional feature.
+
 ### Stage 2 - Stronger Probabilistic Music-Theory Evidence
 
 Represent theory as confidence-bearing continuous evidence rather than hard rules:
@@ -218,7 +233,10 @@ with:
 - ground-truth error label
 
 Split train, calibration, and test by MIDI piece. No piece may contribute candidates
-to more than one split.
+to more than one split. Sweep the Stage 1 threshold and report candidate recall
+ceiling and candidates per piece. The cascade proceeds only if a practical threshold
+reaches candidate recall of at least `0.75`, preferably `0.80`; otherwise improve the
+candidate generator before training a verifier.
 
 ### Stage 4 - Candidate Verifier Baselines
 
@@ -233,9 +251,32 @@ These models serve both as traditional machine-learning paper baselines and as
 Stage 2 cascade verifiers. Select by overall recall at precision `>= 0.80`, not by
 candidate-only recall.
 
-### Stage 5 - Heterogeneous Ensemble
+Because the candidate class prior depends on the Stage 1 threshold, record that
+threshold and the candidate TP/FP ratio for every split. Correct sampling bias using
+class/sample weights or prior correction, and calibrate verifier outputs on an
+untouched piece-level calibration set. Do not interpret raw verifier probabilities
+as deployment probabilities.
 
-Combine models with meaningfully different error patterns:
+### Stage 5 - High-Recall Cascade
+
+Use the strongest detector at a deliberately low candidate threshold,
+then apply the best verifier to remove false positives. Measure and report:
+
+- Stage 1 candidate recall ceiling
+- final precision, recall, F1, TP, FP, and FN
+- recall loss introduced by the verifier
+
+This is the main route toward recall `0.60+` while retaining precision `>= 0.80`.
+
+### Gate 2 - Decide Whether an Ensemble Is Necessary
+
+Evaluate the detector-verifier cascade at precision `>= 0.80`:
+
+- if recall is at least `0.60`, proceed directly to piece-level calibration
+- if recall remains below `0.60`, activate the heterogeneous ensemble experiment
+
+The ensemble is therefore optional rather than a mandatory stage. If activated,
+combine models with meaningfully different error patterns:
 
 - original Step 2
 - frozen Directional Stage 2
@@ -247,18 +288,7 @@ Combine models with meaningfully different error patterns:
 Use validation-trained stacking or calibrated score fusion rather than blindly
 averaging highly correlated models.
 
-### Stage 6 - High-Recall Cascade
-
-Use the strongest detector or ensemble at a deliberately low candidate threshold,
-then apply the best verifier to remove false positives. Measure and report:
-
-- Stage 1 candidate recall ceiling
-- final precision, recall, F1, TP, FP, and FN
-- recall loss introduced by the verifier
-
-This is the main route toward recall `0.60+` while retaining precision `>= 0.80`.
-
-### Stage 7 - Piece-Level Calibration
+### Stage 6 - Piece-Level Calibration
 
 Calibrate on complete held-out pieces rather than treating notes as exchangeable:
 
@@ -267,4 +297,19 @@ Calibrate on complete held-out pieces rather than treating notes as exchangeable
 - reserve a precision safety margin above `0.80`
 - report piece-level variation and validation-to-test drift
 
-Do not start Stages 2-7 until Gate 1 selects the main detector.
+### Paper-Writing Gate
+
+Begin drafting the method and main-results sections after all three conditions hold:
+
+1. Gate 1 selects the frozen or joint Directional Stage 2 detector.
+2. Gate 1.5 documents teacher behavior on errors, chord tones, and ornaments.
+3. Stage 2 produces the main theory-aware ablation and final detector result.
+
+The candidate verifier, optional ensemble, cascade, and piece-level calibration are
+system extensions and additional experiments. They should not delay writing the core
+paper. Any claim of matching or approaching reference-based state of the art remains
+provisional until datasets, error definitions, reference assumptions, and evaluation
+metrics are verified to be directly comparable.
+
+Do not start later stages until Gate 1 selects the main detector. Preserve piece-level
+splits and untouched test evaluation throughout the entire pipeline.
