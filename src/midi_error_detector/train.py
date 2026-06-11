@@ -395,6 +395,7 @@ def _clone_replay_sample(
         "features": batch["features"][item_idx].detach().cpu().clone(),
         "is_error": batch["is_error"][item_idx].detach().cpu().clone(),
         "target_pitch": batch["target_pitch"][item_idx].detach().cpu().clone(),
+        "correction_target": batch["correction_target"][item_idx].detach().cpu().clone(),
         "error_kind": batch["error_kind"][item_idx].detach().cpu().clone(),
         "det_weight": batch["det_weight"][item_idx].detach().cpu().clone() * float(replay_weight),
         "mask": batch["mask"][item_idx].detach().cpu().clone(),
@@ -436,6 +437,7 @@ def append_hard_replay_samples(
                     "features": batch["features"][item_idx].detach().cpu().clone(),
                     "is_error": batch["is_error"][item_idx].detach().cpu().clone(),
                     "target_pitch": batch["target_pitch"][item_idx].detach().cpu().clone(),
+                    "correction_target": batch["correction_target"][item_idx].detach().cpu().clone(),
                     "error_kind": batch["error_kind"][item_idx].detach().cpu().clone(),
                     "det_weight": batch["det_weight"][item_idx].detach().cpu().clone(),
                     "mask": batch["mask"][item_idx].detach().cpu().clone(),
@@ -520,7 +522,15 @@ def make_replay_batches(
 ) -> Iterator[dict[str, torch.Tensor]]:
     """Yield mini-batches from the previous epoch's hardest windows."""
 
-    tensor_keys = ["features", "is_error", "target_pitch", "error_kind", "det_weight", "mask"]
+    tensor_keys = [
+        "features",
+        "is_error",
+        "target_pitch",
+        "correction_target",
+        "error_kind",
+        "det_weight",
+        "mask",
+    ]
     for start in range(0, len(replay_buffer), batch_size):
         samples = replay_buffer[start : start + batch_size]
         yield {
@@ -631,6 +641,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transformer-d-model", type=int, default=192)
     parser.add_argument("--transformer-heads", type=int, default=4)
     parser.add_argument("--transformer-ffn-dim", type=int, default=512)
+    parser.add_argument(
+        "--unified-correction",
+        action="store_true",
+        help="Predict the expected pitch or NULL for detected errors instead of training keep/replace/delete classes.",
+    )
     parser.add_argument("--pitch-loss-weight", type=float, default=0.5)
     parser.add_argument("--kind-loss-weight", type=float, default=0.3)
     parser.add_argument(
@@ -912,6 +927,7 @@ def run_epoch(
     if directional_models is not None:
         directional_models[0].eval()
         directional_models[2].eval()
+    unified_correction = bool(getattr(model, "unified_correction", False))
     totals = {
         "loss": 0.0,
         "det_loss": 0.0,
@@ -924,6 +940,9 @@ def run_epoch(
         "surprise_error_notes": 0.0,
         "pitch_loss": 0.0,
         "kind_loss": 0.0,
+        "correction_correct": 0.0,
+        "correction_top3": 0.0,
+        "null_correct": 0.0,
         "pitch_correct": 0.0,
         "replace_pitch_top1": 0.0,
         "replace_pitch_top3": 0.0,
@@ -951,6 +970,7 @@ def run_epoch(
         features = batch["features"].to(device)
         is_error = batch["is_error"].to(device)
         target_pitch = batch["target_pitch"].to(device)
+        correction_target = batch["correction_target"].to(device)
         error_kind = batch["error_kind"].to(device)
         det_weight = batch["det_weight"].to(device)
         mask = batch["mask"].to(device)
@@ -1008,9 +1028,18 @@ def run_epoch(
                 pos_weight=det_pos_weight,
                 sample_weight=det_weight,
             )
-            pitch_mask = mask * (error_kind != 2).float()
-            pitch_loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, pitch_mask)
-            kind_loss = masked_kind_loss(outputs["kind_logits"], error_kind, mask, class_weight=kind_class_weight)
+            if unified_correction:
+                pitch_mask = mask * is_error
+                pitch_loss = masked_pitch_loss(
+                    outputs["correction_logits"],
+                    correction_target,
+                    pitch_mask,
+                )
+                kind_loss = features.sum() * 0.0
+            else:
+                pitch_mask = mask * (error_kind != 2).float()
+                pitch_loss = masked_pitch_loss(outputs["pitch_logits"], target_pitch, pitch_mask)
+                kind_loss = masked_kind_loss(outputs["kind_logits"], error_kind, mask, class_weight=kind_class_weight)
             ranking_loss = hard_pairwise_ranking_loss(
                 outputs["error_logits"],
                 is_error,
@@ -1070,12 +1099,21 @@ def run_epoch(
         clean_predictions = (~error_predictions) & valid_mask
         replace_targets = (error_kind == 1) & valid_mask
         delete_targets = (error_kind == 2) & valid_mask
-        kind_predictions = outputs["kind_logits"].argmax(dim=-1)
-        pitch_predictions = outputs["pitch_logits"].argmax(dim=-1)
-        pitch_top3 = outputs["pitch_logits"].topk(k=3, dim=-1).indices
-        pitch_correct = pitch_predictions == target_pitch
-        pitch_top3_correct = (pitch_top3 == target_pitch.unsqueeze(-1)).any(dim=-1)
-        kind_correct = kind_predictions == error_kind
+        if unified_correction:
+            correction_predictions = outputs["correction_logits"].argmax(dim=-1)
+            correction_top3 = outputs["correction_logits"].topk(k=3, dim=-1).indices
+            correction_correct = correction_predictions == correction_target
+            correction_top3_correct = (correction_top3 == correction_target.unsqueeze(-1)).any(dim=-1)
+            kind_correct = torch.zeros_like(valid_mask)
+            pitch_correct = correction_correct
+            pitch_top3_correct = correction_top3_correct
+        else:
+            kind_predictions = outputs["kind_logits"].argmax(dim=-1)
+            pitch_predictions = outputs["pitch_logits"].argmax(dim=-1)
+            pitch_top3 = outputs["pitch_logits"].topk(k=3, dim=-1).indices
+            pitch_correct = pitch_predictions == target_pitch
+            pitch_top3_correct = (pitch_top3 == target_pitch.unsqueeze(-1)).any(dim=-1)
+            kind_correct = kind_predictions == error_kind
 
         totals["loss"] += float(loss.detach()) * float(mask.sum())
         totals["det_loss"] += float(det_loss.detach()) * float(mask.sum())
@@ -1089,6 +1127,10 @@ def run_epoch(
         totals["surprise_error_notes"] += float((available_mask & error_targets).sum())
         totals["pitch_loss"] += float(pitch_loss.detach()) * float(pitch_mask.sum().clamp_min(1.0))
         totals["kind_loss"] += float(kind_loss.detach()) * float(mask.sum())
+        if unified_correction:
+            totals["correction_correct"] += float((correction_correct & error_targets).sum())
+            totals["correction_top3"] += float((correction_top3_correct & error_targets).sum())
+            totals["null_correct"] += float((correction_correct & delete_targets).sum())
         totals["pitch_correct"] += float((pitch_correct & valid_mask & (error_kind != 2)).sum())
         totals["replace_pitch_top1"] += float((pitch_correct & replace_targets).sum())
         totals["replace_pitch_top3"] += float((pitch_top3_correct & replace_targets).sum())
@@ -1111,7 +1153,10 @@ def run_epoch(
         totals["notes"] += float(mask.sum())
 
     notes = max(totals["notes"], 1.0)
-    correction_notes = max(notes - totals["delete_notes"], 1.0)
+    correction_notes = max(
+        totals["error_notes"] if unified_correction else notes - totals["delete_notes"],
+        1.0,
+    )
     replace_notes = max(totals["replace_notes"], 1.0)
     delete_notes = max(totals["delete_notes"], 1.0)
     precision_denominator = max(totals["tp"] + totals["fp"], 1.0)
@@ -1166,15 +1211,24 @@ def run_epoch(
 
     replace_kind_acc = totals["replace_kind_correct"] / replace_notes
     replace_pitch_top3 = totals["replace_pitch_top3"] / replace_notes
-    task_score = 0.50 * best_threshold_f1 + 0.25 * replace_pitch_top3 + 0.25 * replace_kind_acc
-    precision_task_score = 0.60 * best_threshold_f0_5 + 0.25 * replace_pitch_top3 + 0.15 * replace_kind_acc
     precision_shortfall = max(0.0, target_precision - best_f0_5_precision)
-    precision_recall_score = (
-        precision_constrained_recall
-        + 0.20 * replace_pitch_top3
-        + 0.10 * replace_kind_acc
-        - 2.0 * precision_shortfall
-    )
+    if unified_correction:
+        correction_top3 = totals["correction_top3"] / correction_notes
+        null_acc = totals["null_correct"] / delete_notes
+        task_score = best_threshold_f1
+        precision_task_score = best_threshold_f0_5
+        precision_recall_score = precision_constrained_recall - 2.0 * precision_shortfall
+    else:
+        correction_top3 = replace_pitch_top3
+        null_acc = totals["delete_kind_correct"] / delete_notes
+        task_score = 0.50 * best_threshold_f1 + 0.25 * replace_pitch_top3 + 0.25 * replace_kind_acc
+        precision_task_score = 0.60 * best_threshold_f0_5 + 0.25 * replace_pitch_top3 + 0.15 * replace_kind_acc
+        precision_recall_score = (
+            precision_constrained_recall
+            + 0.20 * replace_pitch_top3
+            + 0.10 * replace_kind_acc
+            - 2.0 * precision_shortfall
+        )
     metrics = {
         "loss": totals["loss"] / notes,
         "det_loss": totals["det_loss"] / notes,
@@ -1183,6 +1237,9 @@ def run_epoch(
         "mean_clean_surprise": totals["surprise_clean_sum"] / max(totals["surprise_clean_notes"], 1.0),
         "mean_error_surprise": totals["surprise_error_sum"] / max(totals["surprise_error_notes"], 1.0),
         "pitch_loss": totals["pitch_loss"] / correction_notes,
+        "correction_acc": totals["correction_correct"] / correction_notes if unified_correction else 0.0,
+        "correction_top3": correction_top3,
+        "null_correction_acc": null_acc,
         "kind_loss": totals["kind_loss"] / notes,
         "pitch_acc": totals["pitch_correct"] / correction_notes,
         "replace_pitch_top1": totals["replace_pitch_top1"] / replace_notes,
@@ -1258,6 +1315,7 @@ def main() -> None:
         surprise_embedding_dim=args.surprise_embedding_dim,
         correction_evidence_dim=args.correction_evidence_dim,
         correction_embedding_dim=args.correction_embedding_dim,
+        unified_correction=args.unified_correction,
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)

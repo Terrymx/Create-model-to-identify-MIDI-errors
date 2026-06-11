@@ -32,8 +32,9 @@ ErrorKind = Literal[
     "delete_touch",
 ]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
+NULL_CORRECTION_ID = 128
 FEATURE_SIZE = 36
-CORRUPTION_PROFILE = "piano_keyboard_v3"
+CORRUPTION_PROFILE = "piano_keyboard_v4_unified_correction"
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}
@@ -705,6 +706,8 @@ class MaestroWrongNoteDataset(Dataset):
             [KIND_TO_ID["clean" if kind == "clean" else "delete" if kind == "delete_touch" else "replace"] for kind in kinds],
             dtype=np.int64,
         )[: self.window_size]
+        correction_target = target_pitch.copy()
+        correction_target[kind_ids == KIND_TO_ID["delete"]] = NULL_CORRECTION_ID
         length = len(corrupted)
         features = note_features(corrupted)
         det_weight = theory_detection_weights(
@@ -720,6 +723,7 @@ class MaestroWrongNoteDataset(Dataset):
             is_error = np.pad(is_error, (0, pad))
             target_pitch = np.pad(target_pitch, (0, pad))
             kind_ids = np.pad(kind_ids, (0, pad))
+            correction_target = np.pad(correction_target, (0, pad))
             det_weight = np.pad(det_weight, (0, pad))
 
         mask = np.zeros(self.window_size, dtype=np.float32)
@@ -728,6 +732,7 @@ class MaestroWrongNoteDataset(Dataset):
             "features": torch.from_numpy(features),
             "is_error": torch.from_numpy(is_error.astype(np.float32)),
             "target_pitch": torch.from_numpy(target_pitch.astype(np.int64)),
+            "correction_target": torch.from_numpy(correction_target.astype(np.int64)),
             "error_kind": torch.from_numpy(kind_ids.astype(np.int64)),
             "det_weight": torch.from_numpy(det_weight.astype(np.float32)),
             "mask": torch.from_numpy(mask),

@@ -4,6 +4,8 @@ param(
 
     [string]$Python = "python",
 
+    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_unified_detector.pt",
+
     [switch]$SkipWarmup
 )
 
@@ -14,6 +16,7 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 $shared = @(
     "-B", "-u", "-m", "midi_error_detector.train",
     "--model", "transformer",
+    "--unified-correction",
     "--explicit-correction-evidence",
     "--directional-forward-checkpoint", "checkpoints\transformer_forward_likelihood_leakage_safe.pt",
     "--directional-backward-checkpoint", "checkpoints\transformer_backward_likelihood_leakage_safe.pt",
@@ -46,7 +49,6 @@ $shared = @(
     "--fn-replay-weight", "1.5",
     "--fp-replay-weight", "0.4",
     "--target-precision", "0.8",
-    "--kind-class-weights", "1", "6", "4",
     "--threshold-sweep", "0.35", "0.4", "0.45", "0.5", "0.55", "0.6", "0.65", "0.7", "0.75", "0.8", "0.85", "0.9", "0.93", "0.95",
     "--save-metric", "precision_recall_score",
     "--num-workers", "0"
@@ -54,7 +56,7 @@ $shared = @(
 
 if (-not $SkipWarmup) {
     & $Python @shared `
-        --init-checkpoint "checkpoints\transformer_explicit_surprise_step2.pt" `
+        --init-checkpoint $BaseCheckpoint `
         --freeze-detector-backbone `
         --epochs 8 `
         --early-stop-patience 4 `
@@ -64,9 +66,9 @@ if (-not $SkipWarmup) {
         --lr-patience 2 `
         --lr-factor 0.5 `
         --lr-threshold 0.001 `
-        --output "checkpoints\transformer_directional_stage2_warmup.pt" `
-        1> "training_logs\directional_stage2_warmup.log" `
-        2> "training_logs\directional_stage2_warmup.err.log"
+        --output "checkpoints\transformer_keyboard_aware_unified_directional_warmup.pt" `
+        1> "training_logs\keyboard_aware_unified_directional_warmup.log" `
+        2> "training_logs\keyboard_aware_unified_directional_warmup.err.log"
 
     if ($LASTEXITCODE -ne 0) {
         throw "Directional Stage 2 warm-up failed with exit code $LASTEXITCODE"
@@ -74,9 +76,10 @@ if (-not $SkipWarmup) {
 }
 
 & $Python @shared `
-    --init-checkpoint "checkpoints\transformer_directional_stage2_warmup.pt" `
+    --init-checkpoint "checkpoints\transformer_keyboard_aware_unified_directional_warmup.pt" `
     --epochs 28 `
     --early-stop-patience 8 `
+    --pitch-loss-weight 0.2 `
     --masked-pitch-loss-weight 0.35 `
     --masked-pitch-rate 0.18 `
     --clean-mask-batches-per-epoch 900 `
@@ -84,9 +87,9 @@ if (-not $SkipWarmup) {
     --lr-patience 4 `
     --lr-factor 0.5 `
     --lr-threshold 0.001 `
-    --output "checkpoints\transformer_directional_stage2.pt" `
-    1> "training_logs\directional_stage2.log" `
-    2> "training_logs\directional_stage2.err.log"
+    --output "checkpoints\transformer_keyboard_aware_unified_directional_joint.pt" `
+    1> "training_logs\keyboard_aware_unified_directional_joint.log" `
+    2> "training_logs\keyboard_aware_unified_directional_joint.err.log"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Directional Stage 2 full training failed with exit code $LASTEXITCODE"

@@ -185,6 +185,7 @@ def main() -> None:
         explicit_correction_evidence=bool(train_args.get("explicit_correction_evidence", False)),
         surprise_embedding_dim=int(train_args.get("surprise_embedding_dim", 16)),
         correction_embedding_dim=int(train_args.get("correction_embedding_dim", 32)),
+        unified_correction=bool(train_args.get("unified_correction", False)),
     ).to(device)
     model.load_state_dict(state_dict)
     model.eval()
@@ -230,10 +231,24 @@ def main() -> None:
             else:
                 outputs = model(features)
             window_probabilities = torch.sigmoid(outputs["error_logits"])[0].cpu()
-            window_action_probabilities = torch.softmax(outputs["kind_logits"], dim=-1)[0].cpu()
-            top_k = min(output_top_k, outputs["pitch_logits"].shape[-1])
+            if "correction_logits" in outputs:
+                correction_probabilities = torch.softmax(outputs["correction_logits"], dim=-1)[0]
+                null_probability = correction_probabilities[..., 128]
+                window_action_probabilities = torch.stack(
+                    [
+                        torch.zeros_like(null_probability),
+                        1.0 - null_probability,
+                        null_probability,
+                    ],
+                    dim=-1,
+                ).cpu()
+                pitch_distribution = correction_probabilities[..., :128]
+            else:
+                window_action_probabilities = torch.softmax(outputs["kind_logits"], dim=-1)[0].cpu()
+                pitch_distribution = torch.softmax(outputs["pitch_logits"], dim=-1)[0]
+            top_k = min(output_top_k, pitch_distribution.shape[-1])
             reported_top_k = top_k
-            window_pitch_scores, window_pitch_indices = torch.softmax(outputs["pitch_logits"], dim=-1)[0].topk(
+            window_pitch_scores, window_pitch_indices = pitch_distribution.topk(
                 k=top_k,
                 dim=-1,
             )

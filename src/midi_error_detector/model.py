@@ -41,11 +41,13 @@ class BiGRUWrongNoteModel(nn.Module):
         surprise_embedding_dim: int = 16,
         correction_evidence_dim: int = 7,
         correction_embedding_dim: int = 32,
+        unified_correction: bool = False,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
         self.correction_evidence_dim = correction_evidence_dim
+        self.unified_correction = unified_correction
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         recurrent_dropout = dropout if num_layers > 1 else 0.0
@@ -80,6 +82,7 @@ class BiGRUWrongNoteModel(nn.Module):
             self.error_head = nn.Linear(hidden_size * 2, 1)
         self.kind_head = nn.Linear(hidden_size * 2, 3)
         self.pitch_head = nn.Linear(hidden_size * 2, 128)
+        self.correction_head = nn.Linear(hidden_size * 2, 129) if unified_correction else None
 
     def encode(self, features: torch.Tensor) -> torch.Tensor:
         encoded, _ = self.encoder(features)
@@ -117,11 +120,14 @@ class BiGRUWrongNoteModel(nn.Module):
             normalized_surprise = surprise.clamp(0.0, 12.0) / 12.0
             surprise_inputs = torch.stack([normalized_surprise, surprise_available.float()], dim=-1)
             error_features = torch.cat([encoded, self.surprise_projection(surprise_inputs)], dim=-1)
-        return {
+        outputs = {
             "error_logits": self.error_head(error_features).squeeze(-1),
             "kind_logits": self.kind_head(encoded),
             "pitch_logits": self.pitch_head(encoded),
         }
+        if self.correction_head is not None:
+            outputs["correction_logits"] = self.correction_head(encoded)
+        return outputs
 
 
 class TransformerWrongNoteModel(nn.Module):
@@ -144,11 +150,13 @@ class TransformerWrongNoteModel(nn.Module):
         surprise_embedding_dim: int = 16,
         correction_evidence_dim: int = 7,
         correction_embedding_dim: int = 32,
+        unified_correction: bool = False,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
         self.correction_evidence_dim = correction_evidence_dim
+        self.unified_correction = unified_correction
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         self.input_projection = nn.Linear(input_size, d_model)
@@ -186,6 +194,7 @@ class TransformerWrongNoteModel(nn.Module):
             self.error_head = nn.Linear(d_model, 1)
         self.kind_head = nn.Linear(d_model, 3)
         self.pitch_head = nn.Linear(d_model, 128)
+        self.correction_head = nn.Linear(d_model, 129) if unified_correction else None
 
     def encode(self, features: torch.Tensor, causal: bool = False) -> torch.Tensor:
         encoded = self.input_projection(features)
@@ -236,11 +245,14 @@ class TransformerWrongNoteModel(nn.Module):
             normalized_surprise = surprise.clamp(0.0, 12.0) / 12.0
             surprise_inputs = torch.stack([normalized_surprise, surprise_available.float()], dim=-1)
             error_features = torch.cat([encoded, self.surprise_projection(surprise_inputs)], dim=-1)
-        return {
+        outputs = {
             "error_logits": self.error_head(error_features).squeeze(-1),
             "kind_logits": self.kind_head(encoded),
             "pitch_logits": self.pitch_head(encoded),
         }
+        if self.correction_head is not None:
+            outputs["correction_logits"] = self.correction_head(encoded)
+        return outputs
 
 
 def build_wrong_note_model(
@@ -257,6 +269,7 @@ def build_wrong_note_model(
     surprise_embedding_dim: int = 16,
     correction_evidence_dim: int = 7,
     correction_embedding_dim: int = 32,
+    unified_correction: bool = False,
 ) -> nn.Module:
     if model_type == "bigru":
         return BiGRUWrongNoteModel(
@@ -269,6 +282,7 @@ def build_wrong_note_model(
             surprise_embedding_dim=surprise_embedding_dim,
             correction_evidence_dim=correction_evidence_dim,
             correction_embedding_dim=correction_embedding_dim,
+            unified_correction=unified_correction,
         )
     if model_type == "transformer":
         return TransformerWrongNoteModel(
@@ -283,6 +297,7 @@ def build_wrong_note_model(
             surprise_embedding_dim=surprise_embedding_dim,
             correction_evidence_dim=correction_evidence_dim,
             correction_embedding_dim=correction_embedding_dim,
+            unified_correction=unified_correction,
         )
     raise ValueError(f"Unknown model type: {model_type}")
 

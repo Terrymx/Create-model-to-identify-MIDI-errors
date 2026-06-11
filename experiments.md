@@ -1509,10 +1509,10 @@ Experimental consequence:
 New run:
 
 - script: `scripts/train_keyboard_aware_explicit_detector.ps1`
-- checkpoint: `checkpoints/transformer_keyboard_aware_explicit_detector.pt`
+- checkpoint: `checkpoints/transformer_keyboard_aware_unified_detector.pt`
 - logs:
-  - `training_logs/keyboard_aware_explicit_detector.log`
-  - `training_logs/keyboard_aware_explicit_detector.err.log`
+  - `training_logs/keyboard_aware_unified_detector.log`
+  - `training_logs/keyboard_aware_unified_detector.err.log`
 
 Evaluation:
 
@@ -1520,3 +1520,50 @@ Evaluation:
 - sparse validation error rate remains `0.01`
 - target metric remains recall at precision `>=0.80`
 - test is reserved for evaluation after model selection
+
+## 2026-06-11 - Unified Correction Target
+
+The keyboard-aware v3 run was stopped before completion because the old
+keep/replace/delete action objective is ambiguous for compound performance errors.
+For example, a nearby replacement plus an extra accidental touch contains both a
+missing intended pitch and a superfluous pitch; forcing each observed event into a
+single action class makes the training target depend on alignment conventions.
+
+The revised `piano_keyboard_v4_unified_correction` task has two public outputs:
+
+1. binary note detection: correct or incorrect
+2. correction suggestion for detected errors:
+   - MIDI pitches `0..127`: the pitch expected at this position
+   - class `128`: `NULL`, meaning that the observed note is an extra touch and
+     should be removed
+
+`error_kind` remains only as internal synthetic-data bookkeeping so the generator
+can construct the 129-class target. It is not optimized by the new model.
+
+Training details:
+
+- keep the 128-class masked pitch head as the clean-music likelihood teacher
+- add a separate 129-class correction head
+- train correction cross-entropy only on erroneous notes, preventing sparse clean
+  notes from rewarding the trivial identity-copy shortcut
+- set the legacy kind-loss weight to zero
+- select checkpoints only by recall under the validation precision floor
+- retain explicit correction evidence, the three-stage corruption curriculum,
+  and FN-heavy asymmetric hard replay
+
+After the 36-epoch base detector completes, rerun both frozen and joint Directional
+Stage 2 from this checkpoint and compare them at `Precision >= 0.80`. Historical
+v3 and legacy Stage 2 results remain ablations and are not directly comparable to
+the corrected v4 corruption distribution.
+
+The sequential runner is `scripts/run_keyboard_aware_unified_pipeline.ps1`. It
+produces:
+
+- base: `checkpoints/transformer_keyboard_aware_unified_detector.pt`
+- frozen Stage 2:
+  `checkpoints/transformer_keyboard_aware_unified_directional_frozen.pt`
+- joint Stage 2:
+  `checkpoints/transformer_keyboard_aware_unified_directional_joint.pt`
+
+The joint branch retains a smaller unified correction loss (`0.2`) while updating
+the detector encoder; the frozen branch changes only evidence fusion and detection.
