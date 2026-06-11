@@ -1469,7 +1469,7 @@ Problem found:
 - the frozen Directional Stage 2 run was stopped during epoch 4 because it was still
   using this incomplete corruption profile
 
-Correction profile `piano_keyboard_v2`:
+Correction profile `piano_keyboard_v3`:
 
 - sample immediate chromatic keys on either side
 - also sample the nearest same-color key on either side
@@ -1480,13 +1480,28 @@ Correction profile `piano_keyboard_v2`:
   - C#4 -> A#3, C4, D4, or D#4
 - apply the same keyboard topology to replacement slips and extra accidental touches
 
+Mis-touch semantics are separated explicitly:
+
+- `neighbor` (`24%`): omit the intended note and press one adjacent key; replace it
+- `neighbor_extra_touch` (`12%`): keep the intended note and simultaneously press
+  an adjacent key; keep the correct note and delete only the extra touch
+- `nearby` (`24%`): omit the intended note and press another pitch within seven
+  semitones
+- `nearby_plus_touch` (`10%`): replace the intended note with a nearby wrong pitch
+  and simultaneously add another adjacent touch
+- `scale_slip` (`15%`), `chord_slip` (`10%`), and octave displacement (`5%`)
+
+This distinction matters for the action target even when the detector architecture
+is unchanged: replacement mistakes require a pitch suggestion, while simultaneous
+extra touches require deletion without suppressing the correctly played note.
+
 Experimental consequence:
 
 - legacy detector and Stage 2 metrics remain historical ablations but are not final
   results under the corrected task distribution
 - freezing the legacy Step 2 encoder would preserve its old corruption bias
 - restart from a from-scratch explicit correction-to-detection Transformer using
-  `piano_keyboard_v2`
+  `piano_keyboard_v3`
 - use validation, not test, for checkpoint and threshold selection
 - after the new base model finishes, rerun frozen and joint Directional Stage 2 from
   the keyboard-aware checkpoint

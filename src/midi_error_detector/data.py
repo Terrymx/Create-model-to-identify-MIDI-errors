@@ -23,6 +23,7 @@ from tqdm import tqdm
 ErrorKind = Literal[
     "clean",
     "neighbor",
+    "neighbor_extra_touch",
     "nearby",
     "nearby_plus_touch",
     "scale_slip",
@@ -32,7 +33,7 @@ ErrorKind = Literal[
 ]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
 FEATURE_SIZE = 36
-CORRUPTION_PROFILE = "piano_keyboard_v2"
+CORRUPTION_PROFILE = "piano_keyboard_v3"
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}
@@ -206,8 +207,10 @@ def corrupt_note_window(
       piano key, including slips such as C->D as well as C->C#.
     * ``nearby``: replace a note by a random pitch within ``nearby_max_shift``
       semitones, modelling a musically nearby wrong note.
-    * ``nearby_plus_touch``: replace a note and add an extra adjacent accidental
-      touch at almost the same onset.
+    * ``neighbor_extra_touch``: preserve the correct note and add a physically
+      adjacent key at almost the same onset.
+    * ``nearby_plus_touch``: replace the correct note by a nearby wrong pitch and
+      also add an extra adjacent accidental touch.
 
     Returns corrupted notes, binary error labels, clean target pitches, and error
     kind strings aligned to the corrupted notes. Replacement mistakes use the
@@ -240,10 +243,32 @@ def corrupt_note_window(
             continue
 
         error_type = rng.choice(
-            ["neighbor", "nearby", "nearby_plus_touch", "scale_slip", "chord_slip", "octave_displacement"],
-            p=[0.28, 0.27, 0.13, 0.16, 0.11, 0.05],
+            [
+                "neighbor",
+                "neighbor_extra_touch",
+                "nearby",
+                "nearby_plus_touch",
+                "scale_slip",
+                "chord_slip",
+                "octave_displacement",
+            ],
+            p=[0.24, 0.12, 0.24, 0.10, 0.15, 0.10, 0.05],
         )
-        if error_type == "neighbor":
+        if error_type == "neighbor_extra_touch":
+            corrupted.append(note)
+            error_labels.append(0)
+            target_pitches.append(note.pitch)
+            kinds.append("clean")
+
+            touch_pitch = _choose_keyboard_neighbor(note.pitch, rng, piano_low, piano_high)
+            touch_start = max(0.0, note.start + float(rng.normal(0.0, 0.008)))
+            touch_end = max(touch_start + 0.03, min(note.end, touch_start + max(0.05, note.duration * 0.35)))
+            corrupted.append(NoteEvent(touch_pitch, max(1, int(note.velocity * 0.7)), touch_start, touch_end))
+            error_labels.append(1)
+            target_pitches.append(touch_pitch)
+            kinds.append("delete_touch")
+            continue
+        elif error_type == "neighbor":
             new_pitch = _choose_keyboard_neighbor(note.pitch, rng, piano_low, piano_high)
         elif error_type == "scale_slip":
             if rng.random() < 0.5:
