@@ -163,3 +163,108 @@ This is a later stability and ceiling experiment, not the first diagnostic.
   Stage 1 candidate set.
 - Record Stage 1 candidate coverage, final TP/FP/FN, and the full threshold sweep.
 - Keep the sparse evaluation corruption rate at `0.01`.
+
+## 2026-06-11 Finalized Post-Step-2 Roadmap
+
+Primary objective:
+
+`maximize recall subject to precision >= 0.80`
+
+### Gate 1 - Select the Directional Stage 2 Training Strategy
+
+Compare two variants that use the same Step 2 initialization, directional teachers,
+MAESTRO split, corruption curriculum, replay policy, and validation metric:
+
+1. Joint fine-tuning:
+   - freeze the forward and backward likelihood teachers
+   - train the detector encoder, fusion projection, and error head
+   - completed best validation result: precision `0.8064`, recall `0.4936`
+2. Frozen detector:
+   - freeze the Step 2 detector encoder and both directional teachers
+   - train only the fusion projection and error head
+   - validation selects the epoch and threshold; test remains untouched until selection
+
+The frozen variant initializes from `transformer_explicit_surprise_step2.pt`. The
+17-value correction-evidence branch is new, but the detector base is the established
+Step 2 model rather than the weaker from-scratch explicit-correction branch.
+
+Select the variant with the highest validation recall at precision `>= 0.80`. Then
+evaluate both selected checkpoints once on the same test split.
+
+### Stage 2 - Stronger Probabilistic Music-Theory Evidence
+
+Represent theory as confidence-bearing continuous evidence rather than hard rules:
+
+- local key and modulation confidence
+- chord identity, inversion, and chord-confidence estimates
+- passing, neighbor, suspension, and appoggiatura likelihood
+- resolution plausibility
+- beat strength combined with harmonic role
+- voice, bass, and melody role
+- phrase, cadence, and local structural context
+
+The main target is reducing false positives on rare but valid ornamental notes.
+
+### Stage 3 - Unified Candidate Dataset
+
+Run the selected detector at a lower, high-recall threshold. Store each candidate
+with:
+
+- detector probability and logit
+- internal, forward, and backward surprise
+- top pitch alternative, probability gap, and entropy
+- theory and local-structure evidence
+- cross-model agreement
+- ground-truth error label
+
+Split train, calibration, and test by MIDI piece. No piece may contribute candidates
+to more than one split.
+
+### Stage 4 - Candidate Verifier Baselines
+
+Train and compare the following models on exactly the same candidate dataset:
+
+- logistic regression
+- linear and RBF SVM
+- XGBoost
+- small MLP
+
+These models serve both as traditional machine-learning paper baselines and as
+Stage 2 cascade verifiers. Select by overall recall at precision `>= 0.80`, not by
+candidate-only recall.
+
+### Stage 5 - Heterogeneous Ensemble
+
+Combine models with meaningfully different error patterns:
+
+- original Step 2
+- frozen Directional Stage 2
+- different random seeds
+- different corruption curricula
+- Transformer and BiGRU
+- the strongest traditional verifier when useful
+
+Use validation-trained stacking or calibrated score fusion rather than blindly
+averaging highly correlated models.
+
+### Stage 6 - High-Recall Cascade
+
+Use the strongest detector or ensemble at a deliberately low candidate threshold,
+then apply the best verifier to remove false positives. Measure and report:
+
+- Stage 1 candidate recall ceiling
+- final precision, recall, F1, TP, FP, and FN
+- recall loss introduced by the verifier
+
+This is the main route toward recall `0.60+` while retaining precision `>= 0.80`.
+
+### Stage 7 - Piece-Level Calibration
+
+Calibrate on complete held-out pieces rather than treating notes as exchangeable:
+
+- adapt to each piece's score distribution and candidate density
+- consider a high-confidence threshold plus a per-piece top-K policy
+- reserve a precision safety margin above `0.80`
+- report piece-level variation and validation-to-test drift
+
+Do not start Stages 2-7 until Gate 1 selects the main detector.
