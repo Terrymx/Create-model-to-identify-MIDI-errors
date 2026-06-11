@@ -1430,6 +1430,35 @@ Schedule:
    - retain clean masked reconstruction, three-stage corruption curriculum, and
      FN-heavy asymmetric hard replay
 
+## 2026-06-11 - Directional Stage 2 Joint Result and Frozen Control
+
+Joint fine-tuning result:
+
+- stopped after epoch 24; best checkpoint was epoch 16
+- validation operating point at precision `>= 0.80`:
+  - threshold `0.85`
+  - precision `0.8064`
+  - recall `0.4936`
+  - F1 `0.6124`
+- full detector fine-tuning did not preserve the gain seen in the frozen fusion probe
+
+Frozen control started:
+
+- initialize again from `transformer_explicit_surprise_step2.pt`
+- freeze the Step 2 detector backbone and both directional teachers for the entire run
+- train only the 17-value evidence projection and error head
+- retain the same validation split, corruption curriculum, asymmetric hard replay,
+  threshold sweep, and `precision_recall_score` checkpoint selection
+- omit clean masked reconstruction because its encoder and pitch head are frozen
+- output: `checkpoints/transformer_directional_stage2_frozen.pt`
+- logs:
+  - `training_logs/directional_stage2_frozen.log`
+  - `training_logs/directional_stage2_frozen.err.log`
+
+After this run, evaluate the frozen and joint checkpoints once on the same test split
+using validation-selected thresholds. This is the strict comparison used to choose
+the Stage 2 branch for the later ensemble and cascade stages.
+
 Evaluation:
 
 - checkpoint selection uses MAESTRO validation, not test
