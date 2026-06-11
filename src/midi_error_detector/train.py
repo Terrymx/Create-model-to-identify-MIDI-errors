@@ -10,7 +10,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .data import FEATURE_SIZE, MaestroWrongNoteDataset
+from .data import CORRUPTION_PROFILE, FEATURE_SIZE, MaestroWrongNoteDataset
 from .model import build_wrong_note_model, masked_bce_with_logits, masked_kind_loss, masked_pitch_loss
 
 PITCH_CONTEXT_FEATURE_COLUMNS = [
@@ -1221,6 +1221,7 @@ def run_epoch(
 
 def main() -> None:
     args = parse_args()
+    args.corruption_profile = CORRUPTION_PROFILE
     if args.explicit_surprise and args.explicit_correction_evidence:
         raise ValueError("--explicit-surprise and --explicit-correction-evidence are mutually exclusive")
     directional_requested = bool(
@@ -1236,7 +1237,7 @@ def main() -> None:
     if not 0.0 <= args.fn_replay_fraction <= 1.0:
         raise ValueError("--fn-replay-fraction must be between 0 and 1")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"using device={device}", flush=True)
+    print(f"using device={device} corruption_profile={CORRUPTION_PROFILE}", flush=True)
     initial_train_error_rate = 0.0 if args.clean_epochs > 0 else args.train_error_rate
     train_loader = make_loader(args, "train", shuffle=True, error_rate=initial_train_error_rate)
     # Held-out metrics are computed only on corrupted data, because the target

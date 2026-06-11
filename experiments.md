@@ -1459,6 +1459,46 @@ After this run, evaluate the frozen and joint checkpoints once on the same test 
 using validation-selected thresholds. This is the strict comparison used to choose
 the Stage 2 branch for the later ensemble and cascade stages.
 
+## 2026-06-11 - Piano-Keyboard Corruption Audit
+
+Problem found:
+
+- the legacy `neighbor` and accidental-touch corruption sampled only pitch `+/-1`
+- this models chromatic adjacency but misses same-color physical neighbours such as
+  C-D and C#-D#
+- the frozen Directional Stage 2 run was stopped during epoch 4 because it was still
+  using this incomplete corruption profile
+
+Correction profile `piano_keyboard_v2`:
+
+- sample immediate chromatic keys on either side
+- also sample the nearest same-color key on either side
+- merge duplicate candidates and retain piano-range boundaries
+- examples:
+  - C4 -> B3, C#4, or D4
+  - D4 -> C4, C#4, D#4, or E4
+  - C#4 -> A#3, C4, D4, or D#4
+- apply the same keyboard topology to replacement slips and extra accidental touches
+
+Experimental consequence:
+
+- legacy detector and Stage 2 metrics remain historical ablations but are not final
+  results under the corrected task distribution
+- freezing the legacy Step 2 encoder would preserve its old corruption bias
+- restart from a from-scratch explicit correction-to-detection Transformer using
+  `piano_keyboard_v2`
+- use validation, not test, for checkpoint and threshold selection
+- after the new base model finishes, rerun frozen and joint Directional Stage 2 from
+  the keyboard-aware checkpoint
+
+New run:
+
+- script: `scripts/train_keyboard_aware_explicit_detector.ps1`
+- checkpoint: `checkpoints/transformer_keyboard_aware_explicit_detector.pt`
+- logs:
+  - `training_logs/keyboard_aware_explicit_detector.log`
+  - `training_logs/keyboard_aware_explicit_detector.err.log`
+
 Evaluation:
 
 - checkpoint selection uses MAESTRO validation, not test

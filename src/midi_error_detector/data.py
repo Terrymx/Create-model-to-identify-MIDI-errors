@@ -32,6 +32,7 @@ ErrorKind = Literal[
 ]
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
 FEATURE_SIZE = 36
+CORRUPTION_PROFILE = "piano_keyboard_v2"
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}
@@ -44,6 +45,7 @@ _TRIAD_INTERVALS = {
     "minor": {0, 3, 7},
     "diminished": {0, 3, 6},
 }
+_BLACK_KEY_PCS = {1, 3, 6, 8, 10}
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,55 @@ def _random_pitch_shift(rng: np.random.Generator, max_shift: int) -> int:
     return shift
 
 
+def _is_black_key(pitch: int) -> bool:
+    return int(pitch) % 12 in _BLACK_KEY_PCS
+
+
+def _same_color_neighbor(pitch: int, direction: int, low: int, high: int) -> int | None:
+    """Return the next piano key of the same color in one keyboard direction."""
+
+    target_is_black = _is_black_key(pitch)
+    candidate = pitch + direction
+    while low <= candidate <= high:
+        if _is_black_key(candidate) == target_is_black:
+            return candidate
+        candidate += direction
+    return None
+
+
+def _choose_keyboard_neighbor(
+    pitch: int,
+    rng: np.random.Generator,
+    low: int,
+    high: int,
+) -> int:
+    """Sample a physically plausible adjacent-key slip on a piano keyboard.
+
+    Immediate chromatic neighbours model touching the key directly to either side.
+    Same-color neighbours additionally model slips such as C->D or C#->D#, which
+    are adjacent under the hand even though they are two or more semitones apart.
+    """
+
+    candidate_weights: dict[int, float] = {}
+
+    for direction in (-1, 1):
+        chromatic = pitch + direction
+        if low <= chromatic <= high:
+            candidate_weights[chromatic] = candidate_weights.get(chromatic, 0.0) + 1.0
+
+        same_color = _same_color_neighbor(pitch, direction, low, high)
+        if same_color is not None and same_color != pitch:
+            candidate_weights[same_color] = candidate_weights.get(same_color, 0.0) + 0.8
+
+    if not candidate_weights:
+        return _clip_pitch(pitch + (1 if pitch < high else -1), low, high)
+
+    candidates = np.asarray(list(candidate_weights), dtype=np.int64)
+    weights = np.asarray(list(candidate_weights.values()), dtype=np.float64)
+    weights /= weights.sum()
+    return int(rng.choice(candidates, p=weights))
+
+
 def _pitch_class_distance_to_scale(pitch: int, tonic: int, scale_pcs: set[int]) -> float:
     relative_pc = (int(pitch) - tonic) % 12
     return _nearest_scale_distance(relative_pc, scale_pcs)
@@ -151,8 +202,8 @@ def corrupt_note_window(
     """Inject synthetic performance/transcription errors into a clean note window.
 
     Error types:
-    * ``neighbor``: replace a note by an adjacent semitone, modelling a slipped
-      black/white neighbouring key.
+    * ``neighbor``: replace a note by a physically adjacent chromatic or same-color
+      piano key, including slips such as C->D as well as C->C#.
     * ``nearby``: replace a note by a random pitch within ``nearby_max_shift``
       semitones, modelling a musically nearby wrong note.
     * ``nearby_plus_touch``: replace a note and add an extra adjacent accidental
@@ -193,7 +244,7 @@ def corrupt_note_window(
             p=[0.28, 0.27, 0.13, 0.16, 0.11, 0.05],
         )
         if error_type == "neighbor":
-            new_pitch = _clip_pitch(note.pitch + int(rng.choice([-1, 1])), piano_low, piano_high)
+            new_pitch = _choose_keyboard_neighbor(note.pitch, rng, piano_low, piano_high)
         elif error_type == "scale_slip":
             if rng.random() < 0.5:
                 new_pitch = _choose_scale_slip(note, rng, major_tonic, _MAJOR_SCALE_PCS, piano_low, piano_high)
@@ -216,7 +267,7 @@ def corrupt_note_window(
         kinds.append(error_type)  # type: ignore[arg-type]
 
         if error_type == "nearby_plus_touch":
-            touch_pitch = _clip_pitch(note.pitch + int(rng.choice([-1, 1])), piano_low, piano_high)
+            touch_pitch = _choose_keyboard_neighbor(note.pitch, rng, piano_low, piano_high)
             touch_start = max(0.0, note.start + float(rng.normal(0.0, 0.015)))
             touch_end = max(touch_start + 0.03, min(note.end, touch_start + max(0.05, note.duration * 0.35)))
             corrupted.append(NoteEvent(touch_pitch, max(1, int(note.velocity * 0.7)), touch_start, touch_end))
