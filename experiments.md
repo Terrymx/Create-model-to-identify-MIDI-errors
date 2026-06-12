@@ -1544,3 +1544,31 @@ the corrected-data model can first recover the established `P=0.8012, R=0.5307`
 stage and then continue through the frozen and joint Directional Stage 2 runs.
 
 The sequential runner is `scripts/run_keyboard_aware_pipeline.ps1`.
+
+## Planned Follow-up - Binary Clean/Dirty Detector
+
+Do not interrupt the current keyboard-aware pipeline rebuild. After it completes,
+run a separate detector experiment with note-level `clean` versus `dirty` as the
+only primary target.
+
+Motivation:
+
+- in a compound mistake, the performer may play a wrong intended note and also
+  brush an adjacent key
+- the observed MIDI then contains two nearby dirty notes, but a reference-free
+  model cannot reliably identify which one was the primary wrong press and which
+  one was the secondary touch
+- synthetic generation provenance can provide that distinction during training,
+  but relying on it may teach an artificial replace/delete assignment that is not
+  identifiable from real input
+
+The follow-up should therefore compare:
+
+1. the completed existing detector with binary detection plus auxiliary
+   keep/replace/delete and pitch heads
+2. a binary-only clean/dirty detector trained on the same corrected corruption
+   distribution and evaluated with the same piece split and threshold-selection
+   protocol
+
+The primary comparison metric is recall subject to precision >= 0.80. Correction
+can be evaluated separately and must not determine whether a note is dirty.
