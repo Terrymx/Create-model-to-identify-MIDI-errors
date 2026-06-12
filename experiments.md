@@ -1562,13 +1562,27 @@ Motivation:
   but relying on it may teach an artificial replace/delete assignment that is not
   identifiable from real input
 
-The follow-up should therefore compare:
+Both architectures must be trained to the same completed Stage 2 milestone:
 
-1. the completed existing detector with binary detection plus auxiliary
+```text
+Step 1A detector
+  -> explicit masked-context surprise Step 2
+  -> frozen Directional Stage 2
+  -> joint Directional Stage 2
+```
+
+The binary-only branch must not be compared with the completed existing branch
+while it is still at Step 1A. It should receive the same curriculum, asymmetric
+hard replay, likelihood teachers, evidence construction, training budget, data
+split, and checkpoint-selection protocol, except for the removal of the
+replace/delete auxiliary classification target.
+
+The final comparison should therefore be:
+
+1. the completed Stage 2 existing detector with binary detection plus auxiliary
    keep/replace/delete and pitch heads
-2. a binary-only clean/dirty detector trained on the same corrected corruption
-   distribution and evaluated with the same piece split and threshold-selection
-   protocol
+2. the completed Stage 2 binary-only clean/dirty detector trained on the same
+   corrected corruption distribution
 
 The primary comparison metric is recall subject to precision >= 0.80. Correction
 can be evaluated separately and must not determine whether a note is dirty.
