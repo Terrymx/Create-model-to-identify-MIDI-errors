@@ -1495,25 +1495,27 @@ This distinction matters for the action target even when the detector architectu
 is unchanged: replacement mistakes require a pitch suggestion, while simultaneous
 extra touches require deletion without suppressing the correctly played note.
 
-## 2026-06-12 - Keyboard-Aware Controlled Retraining
+## 2026-06-12 - Keyboard-Aware Pipeline Rebuild
 
 Two exploratory runs changed both the corruption distribution and model target.
-They were stopped because they were not controlled comparisons. The stronger
-archived run reached:
+They were stopped because they no longer followed the already validated training
+path that this rebuild is intended to restore. The stronger archived run reached:
 
 - precision `0.8147`
 - recall `0.3110`
 - F1 `0.4502`
 - correction top-3 `0.9134`
 
-These runs are archived only as ablations:
+These runs are archived only as abandoned branches:
 
 - `checkpoints/transformer_keyboard_aware_unified_collapsed_evidence.pt`
 - `training_logs/keyboard_aware_unified_collapsed_evidence.log`
 
-The formal experiment changes exactly one independent variable: synthetic
-corruption generation. Model architecture, action/pitch targets, losses, weights,
-optimizer, schedule, and the successful two-stage training path remain unchanged.
+This is not a new-versus-old comparison experiment. The legacy corruption generator
+was found to model piano mistakes incorrectly, so the dataset generation is repaired
+and the established pipeline is being retrained from the beginning. Model
+architecture, action/pitch targets, losses, weights, optimizer, schedule, and the
+successful training path remain unchanged.
 
 The historical path is:
 
@@ -1522,7 +1524,8 @@ The historical path is:
 2. Step 2 loaded Step 1A, widened the error head, and added masked-context surprise,
    reaching `P=0.8012, R=0.5307`.
 
-The keyboard-aware reproduction is:
+The rebuilt pipeline must train through all milestones already reached by the
+project:
 
 1. `transformer_keyboard_aware_step1a.pt`
    - no explicit detector evidence
@@ -1537,6 +1540,7 @@ The keyboard-aware reproduction is:
 
 The formal Step 1A and Step 2 commands retain the historical `pitch_loss_weight=0.5`,
 `kind_loss_weight=0.3`, class weights `1/6/4`, and test-side evaluation settings so
-the result can be compared directly with the recorded `P=0.8012, R=0.5307`.
+the corrected-data model can first recover the established `P=0.8012, R=0.5307`
+stage and then continue through the frozen and joint Directional Stage 2 runs.
 
 The sequential runner is `scripts/run_keyboard_aware_pipeline.ps1`.
