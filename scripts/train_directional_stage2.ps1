@@ -4,7 +4,7 @@ param(
 
     [string]$Python = "python",
 
-    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_unified_step2.pt",
+    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_step2.pt",
 
     [switch]$SkipWarmup
 )
@@ -16,7 +16,6 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 $shared = @(
     "-B", "-u", "-m", "midi_error_detector.train",
     "--model", "transformer",
-    "--unified-correction",
     "--explicit-correction-evidence",
     "--directional-forward-checkpoint", "checkpoints\transformer_forward_likelihood_leakage_safe.pt",
     "--directional-backward-checkpoint", "checkpoints\transformer_backward_likelihood_leakage_safe.pt",
@@ -66,9 +65,9 @@ if (-not $SkipWarmup) {
         --lr-patience 2 `
         --lr-factor 0.5 `
         --lr-threshold 0.001 `
-        --output "checkpoints\transformer_keyboard_aware_unified_directional_warmup.pt" `
-        1> "training_logs\keyboard_aware_unified_directional_warmup.log" `
-        2> "training_logs\keyboard_aware_unified_directional_warmup.err.log"
+        --output "checkpoints\transformer_keyboard_aware_directional_warmup.pt" `
+        1> "training_logs\keyboard_aware_directional_warmup.log" `
+        2> "training_logs\keyboard_aware_directional_warmup.err.log"
 
     if ($LASTEXITCODE -ne 0) {
         throw "Directional Stage 2 warm-up failed with exit code $LASTEXITCODE"
@@ -76,10 +75,9 @@ if (-not $SkipWarmup) {
 }
 
 & $Python @shared `
-    --init-checkpoint "checkpoints\transformer_keyboard_aware_unified_directional_warmup.pt" `
+    --init-checkpoint "checkpoints\transformer_keyboard_aware_directional_warmup.pt" `
     --epochs 28 `
     --early-stop-patience 8 `
-    --pitch-loss-weight 0.2 `
     --masked-pitch-loss-weight 0.35 `
     --masked-pitch-rate 0.18 `
     --clean-mask-batches-per-epoch 900 `
@@ -87,9 +85,9 @@ if (-not $SkipWarmup) {
     --lr-patience 4 `
     --lr-factor 0.5 `
     --lr-threshold 0.001 `
-    --output "checkpoints\transformer_keyboard_aware_unified_directional_joint.pt" `
-    1> "training_logs\keyboard_aware_unified_directional_joint.log" `
-    2> "training_logs\keyboard_aware_unified_directional_joint.err.log"
+    --output "checkpoints\transformer_keyboard_aware_directional_joint.pt" `
+    1> "training_logs\keyboard_aware_directional_joint.log" `
+    2> "training_logs\keyboard_aware_directional_joint.err.log"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Directional Stage 2 full training failed with exit code $LASTEXITCODE"

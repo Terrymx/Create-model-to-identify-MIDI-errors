@@ -1469,7 +1469,7 @@ Problem found:
 - the frozen Directional Stage 2 run was stopped during epoch 4 because it was still
   using this incomplete corruption profile
 
-Correction profile `piano_keyboard_v3`:
+Correction profile `piano_keyboard_v4`:
 
 - sample immediate chromatic keys on either side
 - also sample the nearest same-color key on either side
@@ -1495,106 +1495,48 @@ This distinction matters for the action target even when the detector architectu
 is unchanged: replacement mistakes require a pitch suggestion, while simultaneous
 extra touches require deletion without suppressing the correctly played note.
 
-Experimental consequence:
+## 2026-06-12 - Keyboard-Aware Controlled Retraining
 
-- legacy detector and Stage 2 metrics remain historical ablations but are not final
-  results under the corrected task distribution
-- freezing the legacy Step 2 encoder would preserve its old corruption bias
-- restart from a from-scratch explicit correction-to-detection Transformer using
-  `piano_keyboard_v3`
-- use validation, not test, for checkpoint and threshold selection
-- after the new base model finishes, rerun frozen and joint Directional Stage 2 from
-  the keyboard-aware checkpoint
-
-Initial collapsed run (later superseded by the restored two-stage path below):
-
-- archived checkpoint:
-  `checkpoints/transformer_keyboard_aware_unified_collapsed_evidence.pt`
-- archived logs:
-  - `training_logs/keyboard_aware_unified_collapsed_evidence.log`
-  - `training_logs/keyboard_aware_unified_collapsed_evidence.err.log`
-
-Evaluation:
-
-- checkpoint selection uses MAESTRO validation, not test
-- sparse validation error rate remains `0.01`
-- target metric remains recall at precision `>=0.80`
-- test is reserved for evaluation after model selection
-
-## 2026-06-11 - Unified Correction Target
-
-The keyboard-aware v3 run was stopped before completion because the old
-keep/replace/delete action objective is ambiguous for compound performance errors.
-For example, a nearby replacement plus an extra accidental touch contains both a
-missing intended pitch and a superfluous pitch; forcing each observed event into a
-single action class makes the training target depend on alignment conventions.
-
-The revised `piano_keyboard_v4_unified_correction` task has two public outputs:
-
-1. binary note detection: correct or incorrect
-2. correction suggestion for detected errors:
-   - MIDI pitches `0..127`: the pitch expected at this position
-   - class `128`: `NULL`, meaning that the observed note is an extra touch and
-     should be removed
-
-`error_kind` remains only as internal synthetic-data bookkeeping so the generator
-can construct the 129-class target. It is not optimized by the new model.
-
-Training details:
-
-- keep the 128-class masked pitch head as the clean-music likelihood teacher
-- add a separate 129-class correction head
-- train correction cross-entropy only on erroneous notes, preventing sparse clean
-  notes from rewarding the trivial identity-copy shortcut
-- set the legacy kind-loss weight to zero
-- select checkpoints only by recall under the validation precision floor
-- retain explicit correction evidence, the three-stage corruption curriculum,
-  and FN-heavy asymmetric hard replay
-
-After the 36-epoch base detector completes, rerun both frozen and joint Directional
-Stage 2 from this checkpoint and compare them at `Precision >= 0.80`. Historical
-v3 and legacy Stage 2 results remain ablations and are not directly comparable to
-the corrected v4 corruption distribution.
-
-## 2026-06-12 - Restore the Successful Two-Stage Explicit Path
-
-The first v4 attempt incorrectly collapsed the historical Step 1A and Step 2 into
-one from-scratch run with seven-value explicit correction evidence. It was stopped
-during epoch 21. Its best saved checkpoint was epoch 19:
+Two exploratory runs changed both the corruption distribution and model target.
+They were stopped because they were not controlled comparisons. The stronger
+archived run reached:
 
 - precision `0.8147`
 - recall `0.3110`
 - F1 `0.4502`
 - correction top-3 `0.9134`
 
-This showed that correction learning was strong, but the detector did not reproduce
-the old `P=0.8012, R=0.5307` frontier. The run is archived as:
+These runs are archived only as ablations:
 
 - `checkpoints/transformer_keyboard_aware_unified_collapsed_evidence.pt`
 - `training_logs/keyboard_aware_unified_collapsed_evidence.log`
 
-The successful historical path was explicitly sequential:
+The formal experiment changes exactly one independent variable: synthetic
+corruption generation. Model architecture, action/pitch targets, losses, weights,
+optimizer, schedule, and the successful two-stage training path remain unchanged.
+
+The historical path is:
 
 1. Step 1A trained the ordinary detector with masked pitch learning, curriculum,
    and asymmetric replay, reaching `P=0.8092, R=0.4256`.
 2. Step 2 loaded Step 1A, widened the error head, and added masked-context surprise,
    reaching `P=0.8012, R=0.5307`.
 
-The corrected v4 pipeline now reproduces that learning order while retaining the
-keyboard-aware corruption profile and unified pitch/NULL correction target:
+The keyboard-aware reproduction is:
 
-1. `transformer_keyboard_aware_unified_step1a.pt`
+1. `transformer_keyboard_aware_step1a.pt`
    - no explicit detector evidence
-   - binary detection plus unified correction
+   - original binary detection, keep/replace/delete action head, and pitch head
    - masked clean pitch learning, curriculum, and asymmetric hard replay
-2. `transformer_keyboard_aware_unified_step2.pt`
-   - initialize from the v4 Step 1A checkpoint
+2. `transformer_keyboard_aware_step2.pt`
+   - initialize from the keyboard-aware Step 1A checkpoint
    - add explicit masked-context surprise
    - copy the existing detector weights into the widened error head
 3. frozen Directional Stage 2
 4. joint Directional Stage 2
 
-The sequential runner is `scripts/run_keyboard_aware_unified_pipeline.ps1`.
-The joint directional branch retains a smaller unified correction loss (`0.2`)
-while updating the detector encoder; the frozen branch changes only evidence fusion
-and detection.
+The formal Step 1A and Step 2 commands retain the historical `pitch_loss_weight=0.5`,
+`kind_loss_weight=0.3`, class weights `1/6/4`, and test-side evaluation settings so
+the result can be compared directly with the recorded `P=0.8012, R=0.5307`.
+
+The sequential runner is `scripts/run_keyboard_aware_pipeline.ps1`.

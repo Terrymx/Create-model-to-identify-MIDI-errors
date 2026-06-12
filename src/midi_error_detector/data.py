@@ -34,7 +34,7 @@ ErrorKind = Literal[
 KIND_TO_ID = {"clean": 0, "replace": 1, "delete": 2}
 NULL_CORRECTION_ID = 128
 FEATURE_SIZE = 36
-CORRUPTION_PROFILE = "piano_keyboard_v4_unified_correction"
+CORRUPTION_PROFILE = "piano_keyboard_v4"
 _MAJOR_PROFILE = np.asarray([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=np.float32)
 _MINOR_PROFILE = np.asarray([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=np.float32)
 _MAJOR_SCALE_PCS = {0, 2, 4, 5, 7, 9, 11}

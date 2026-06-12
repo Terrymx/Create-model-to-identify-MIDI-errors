@@ -4,7 +4,7 @@ param(
 
     [string]$Python = "python",
 
-    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_unified_step2.pt"
+    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_step2.pt"
 )
 
 $ErrorActionPreference = "Continue"
@@ -13,7 +13,6 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 
 & $Python -B -u -m midi_error_detector.train `
     --model transformer `
-    --unified-correction `
     --explicit-correction-evidence `
     --directional-forward-checkpoint "checkpoints\transformer_forward_likelihood_leakage_safe.pt" `
     --directional-backward-checkpoint "checkpoints\transformer_backward_likelihood_leakage_safe.pt" `
@@ -59,9 +58,9 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
     --lr-factor 0.5 `
     --lr-threshold 0.001 `
     --num-workers 0 `
-    --output "checkpoints\transformer_keyboard_aware_unified_directional_frozen.pt" `
-    1> "training_logs\keyboard_aware_unified_directional_frozen.log" `
-    2> "training_logs\keyboard_aware_unified_directional_frozen.err.log"
+    --output "checkpoints\transformer_keyboard_aware_directional_frozen.pt" `
+    1> "training_logs\keyboard_aware_directional_frozen.log" `
+    2> "training_logs\keyboard_aware_directional_frozen.err.log"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Frozen Directional Stage 2 failed with exit code $LASTEXITCODE"
