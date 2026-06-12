@@ -4,7 +4,7 @@ param(
 
     [string]$Python = "python",
 
-    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_unified_detector.pt",
+    [string]$BaseCheckpoint = "checkpoints\transformer_keyboard_aware_unified_step2.pt",
 
     [switch]$SkipWarmup
 )

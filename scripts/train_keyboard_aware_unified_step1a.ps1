@@ -12,9 +12,6 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
 & $Python -B -u -m midi_error_detector.train `
     --model transformer `
     --unified-correction `
-    --explicit-correction-evidence `
-    --correction-evidence-groups 4 `
-    --correction-embedding-dim 32 `
     --data-root $DataRoot `
     --eval-split validation `
     --clean-epochs 0 `
@@ -54,10 +51,10 @@ $env:PYTHONDONTWRITEBYTECODE = "1"
     --lr-factor 0.5 `
     --lr-threshold 0.001 `
     --num-workers 0 `
-    --output "checkpoints\transformer_keyboard_aware_unified_detector.pt" `
-    1> "training_logs\keyboard_aware_unified_detector.log" `
-    2> "training_logs\keyboard_aware_unified_detector.err.log"
+    --output "checkpoints\transformer_keyboard_aware_unified_step1a.pt" `
+    1> "training_logs\keyboard_aware_unified_step1a.log" `
+    2> "training_logs\keyboard_aware_unified_step1a.err.log"
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Keyboard-aware explicit detector training failed with exit code $LASTEXITCODE"
+    throw "Keyboard-aware unified Step 1A training failed with exit code $LASTEXITCODE"
 }

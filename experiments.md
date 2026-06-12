@@ -1506,13 +1506,13 @@ Experimental consequence:
 - after the new base model finishes, rerun frozen and joint Directional Stage 2 from
   the keyboard-aware checkpoint
 
-New run:
+Initial collapsed run (later superseded by the restored two-stage path below):
 
-- script: `scripts/train_keyboard_aware_explicit_detector.ps1`
-- checkpoint: `checkpoints/transformer_keyboard_aware_unified_detector.pt`
-- logs:
-  - `training_logs/keyboard_aware_unified_detector.log`
-  - `training_logs/keyboard_aware_unified_detector.err.log`
+- archived checkpoint:
+  `checkpoints/transformer_keyboard_aware_unified_collapsed_evidence.pt`
+- archived logs:
+  - `training_logs/keyboard_aware_unified_collapsed_evidence.log`
+  - `training_logs/keyboard_aware_unified_collapsed_evidence.err.log`
 
 Evaluation:
 
@@ -1556,14 +1556,45 @@ Stage 2 from this checkpoint and compare them at `Precision >= 0.80`. Historical
 v3 and legacy Stage 2 results remain ablations and are not directly comparable to
 the corrected v4 corruption distribution.
 
-The sequential runner is `scripts/run_keyboard_aware_unified_pipeline.ps1`. It
-produces:
+## 2026-06-12 - Restore the Successful Two-Stage Explicit Path
 
-- base: `checkpoints/transformer_keyboard_aware_unified_detector.pt`
-- frozen Stage 2:
-  `checkpoints/transformer_keyboard_aware_unified_directional_frozen.pt`
-- joint Stage 2:
-  `checkpoints/transformer_keyboard_aware_unified_directional_joint.pt`
+The first v4 attempt incorrectly collapsed the historical Step 1A and Step 2 into
+one from-scratch run with seven-value explicit correction evidence. It was stopped
+during epoch 21. Its best saved checkpoint was epoch 19:
 
-The joint branch retains a smaller unified correction loss (`0.2`) while updating
-the detector encoder; the frozen branch changes only evidence fusion and detection.
+- precision `0.8147`
+- recall `0.3110`
+- F1 `0.4502`
+- correction top-3 `0.9134`
+
+This showed that correction learning was strong, but the detector did not reproduce
+the old `P=0.8012, R=0.5307` frontier. The run is archived as:
+
+- `checkpoints/transformer_keyboard_aware_unified_collapsed_evidence.pt`
+- `training_logs/keyboard_aware_unified_collapsed_evidence.log`
+
+The successful historical path was explicitly sequential:
+
+1. Step 1A trained the ordinary detector with masked pitch learning, curriculum,
+   and asymmetric replay, reaching `P=0.8092, R=0.4256`.
+2. Step 2 loaded Step 1A, widened the error head, and added masked-context surprise,
+   reaching `P=0.8012, R=0.5307`.
+
+The corrected v4 pipeline now reproduces that learning order while retaining the
+keyboard-aware corruption profile and unified pitch/NULL correction target:
+
+1. `transformer_keyboard_aware_unified_step1a.pt`
+   - no explicit detector evidence
+   - binary detection plus unified correction
+   - masked clean pitch learning, curriculum, and asymmetric hard replay
+2. `transformer_keyboard_aware_unified_step2.pt`
+   - initialize from the v4 Step 1A checkpoint
+   - add explicit masked-context surprise
+   - copy the existing detector weights into the widened error head
+3. frozen Directional Stage 2
+4. joint Directional Stage 2
+
+The sequential runner is `scripts/run_keyboard_aware_unified_pipeline.ps1`.
+The joint directional branch retains a smaller unified correction loss (`0.2`)
+while updating the detector encoder; the frozen branch changes only evidence fusion
+and detection.
