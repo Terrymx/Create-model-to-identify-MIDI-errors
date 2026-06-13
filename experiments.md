@@ -1586,3 +1586,23 @@ The final comparison should therefore be:
 
 The primary comparison metric is recall subject to precision >= 0.80. Correction
 can be evaluated separately and must not determine whether a note is dirty.
+
+Execution order was revised on 2026-06-13:
+
+1. finish the currently running existing-head explicit-surprise Step 2
+2. do not start either Directional Stage 2 branch yet
+3. train the binary clean/dirty branch through Step 1A and explicit-surprise Step 2
+4. compare the two aligned Step 2 checkpoints before deciding how to run the
+   Directional Stage 2 experiments
+
+For the binary branch, corrupted batches use only detection BCE, ranking loss, and
+asymmetric hard replay. Both `pitch_loss_weight` and `kind_loss_weight` are zero.
+Masked pitch reconstruction remains enabled only in the separate error-free
+clean-mask phase, so it learns correct musical context for explicit surprise
+without using replace/delete provenance from corrupted examples.
+
+Scripts:
+
+- `scripts/train_keyboard_aware_binary_step1a.ps1`
+- `scripts/train_keyboard_aware_binary_step2.ps1`
+- `scripts/run_binary_through_step2.ps1`
