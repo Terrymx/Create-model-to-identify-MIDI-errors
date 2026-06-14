@@ -1606,3 +1606,4 @@ Scripts:
 - `scripts/train_keyboard_aware_binary_step1a.ps1`
 - `scripts/train_keyboard_aware_binary_step2.ps1`
 - `scripts/run_binary_through_step2.ps1`
+- `scripts/run_binary_through_step2.sh` for the remote Linux training host
