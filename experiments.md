@@ -1607,3 +1607,125 @@ Scripts:
 - `scripts/train_keyboard_aware_binary_step2.ps1`
 - `scripts/run_binary_through_step2.ps1`
 - `scripts/run_binary_through_step2.sh` for the remote Linux training host
+
+## 2026-06-16 - Candidate Cascade and Traditional Baselines
+
+The current `Precision >= 0.80` improvement path is a cascade system rather than
+another full detector retraining:
+
+```text
+Stage 1: existing Step 2 detector + binary unified Step 2 detector
+         -> low-threshold union candidate pool
+Stage 2: verifier trained on candidate-level evidence
+         -> remove false positives while preserving recall
+```
+
+### Union candidate verifier
+
+The first union-candidate verifier used the existing Step 2 detector, the binary
+unified Step 2 detector, and forward/backward likelihood teachers.
+
+Result files:
+
+- `training_logs/union_candidate_verifier.md`
+- `training_logs/union_candidate_verifier.json`
+- `scripts/run_union_candidate_verifier.py`
+
+Key result:
+
+- test candidate recall ceiling: `0.7297`
+- raw candidate precision: `0.5121`
+- three-class Step 2 frontier: `P=0.8038, R=0.5276`
+- binary unified frontier: `P=0.8039, R=0.4929`
+- max-score frontier: `P=0.8044, R=0.5187`
+- MLP verifier test frontier: `P=0.8036, R=0.5623`
+
+This showed the candidate pool contains enough true errors for `R > 0.60`, but
+the ranking/filtering stage still needs improvement.
+
+### Piece-level calibration
+
+Result files:
+
+- `training_logs/union_candidate_piece_calibration.md`
+- `training_logs/union_candidate_piece_calibration.json`
+- `scripts/calibrate_union_candidate_verifier.py`
+
+Calibration alone did not cross the `R >= 0.60` target under the precision
+constraint:
+
+- global margin `0.00`: `P=0.7508, R=0.6131`
+- global margin `0.05`: `P=0.8036, R=0.5623`
+- top-k per piece achieved high precision but too little recall
+
+Conclusion: piece-level calibration is useful as a final stabilizer, but it does
+not fix the current ranking bottleneck by itself.
+
+### Verifier model comparison
+
+Result files:
+
+- `training_logs/union_candidate_verifier_variants.md`
+- `training_logs/union_candidate_verifier_variants.json`
+- `scripts/run_union_candidate_verifier_variants.py`
+
+The best candidate-level verifier was a traditional tree model:
+
+- `sklearn_hist_gradient_boosting`: `P=0.8031, R=0.5762`
+- `sklearn_logreg_balanced` test frontier: `P=0.8014, R=0.5723`
+- best MLP variant: `P=0.8006, R=0.5708`
+- random forest: `P=0.8050, R=0.5657`
+
+This does not mean traditional ML is better than the sequence model. It means
+the Stage 2 verifier is a tabular candidate-ranking problem after the deep
+detectors and likelihood teachers have already produced strong evidence. Tree
+models are well matched to this stage.
+
+### True traditional end-to-end baseline
+
+Result files:
+
+- `training_logs/traditional_end_to_end_baseline.md`
+- `training_logs/traditional_end_to_end_baseline.json`
+- `scripts/run_traditional_end_to_end_baseline.py`
+
+This is the strict traditional baseline: it does not use transformer detector
+probabilities, likelihood-teacher surprise, or a DL-generated candidate pool. It
+trains directly on `note_features()` hand-crafted note/music-theory features and
+predicts clean versus wrong for every note.
+
+Settings:
+
+- train split: MAESTRO train
+- train error rate: `0.08`
+- validation/test error rate: `0.01`
+- training sample: `500000` notes from `11193985` seen notes
+- validation notes: `1261824`
+- test notes: `1457920`
+
+Best strict traditional result:
+
+- `hist_gradient_boosting`: `P=0.8523, R=0.0924`
+- random forest frontier: `P=0.8056, R=0.0345`
+- logistic regression and linear SVM were effectively unusable at the precision
+  constraint
+
+Conclusion: pure hand-crafted traditional methods are not sufficient for
+reference-free wrong-note detection over all notes. Their useful role is as a
+cascade verifier after a deep contextual detector has proposed candidates.
+
+### Current next experiment
+
+`scripts/run_union_candidate_context_verifier.py` adds piece-relative and local
+candidate-context features to the Stage 2 verifier:
+
+- score rank/z-score within each piece
+- per-piece candidate density
+- note position within the piece
+- local mean/max detector score and likelihood surprise over neighboring notes
+- multiple lower Stage 1 candidate-threshold combinations
+
+The first run exposed a CPU/GPU indexing bug in the metadata feature path. The
+script has been fixed and relaunched on the remote training host. Its results
+will determine whether improved Stage 2 ranking can move from the current
+`P=0.8031, R=0.5762` frontier to `R >= 0.60`.
