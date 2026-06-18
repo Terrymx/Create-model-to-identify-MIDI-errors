@@ -42,12 +42,14 @@ class BiGRUWrongNoteModel(nn.Module):
         correction_evidence_dim: int = 7,
         correction_embedding_dim: int = 32,
         unified_correction: bool = False,
+        delete_auxiliary_head: bool = False,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
         self.correction_evidence_dim = correction_evidence_dim
         self.unified_correction = unified_correction
+        self.delete_auxiliary_head = delete_auxiliary_head
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         recurrent_dropout = dropout if num_layers > 1 else 0.0
@@ -83,6 +85,7 @@ class BiGRUWrongNoteModel(nn.Module):
         self.kind_head = nn.Linear(hidden_size * 2, 3)
         self.pitch_head = nn.Linear(hidden_size * 2, 128)
         self.correction_head = nn.Linear(hidden_size * 2, 129) if unified_correction else None
+        self.delete_head = nn.Linear(hidden_size * 2, 1) if delete_auxiliary_head else None
 
     def encode(self, features: torch.Tensor) -> torch.Tensor:
         encoded, _ = self.encoder(features)
@@ -127,6 +130,8 @@ class BiGRUWrongNoteModel(nn.Module):
         }
         if self.correction_head is not None:
             outputs["correction_logits"] = self.correction_head(encoded)
+        if self.delete_head is not None:
+            outputs["delete_logits"] = self.delete_head(encoded).squeeze(-1)
         return outputs
 
 
@@ -151,12 +156,14 @@ class TransformerWrongNoteModel(nn.Module):
         correction_evidence_dim: int = 7,
         correction_embedding_dim: int = 32,
         unified_correction: bool = False,
+        delete_auxiliary_head: bool = False,
     ):
         super().__init__()
         self.explicit_surprise = explicit_surprise
         self.explicit_correction_evidence = explicit_correction_evidence
         self.correction_evidence_dim = correction_evidence_dim
         self.unified_correction = unified_correction
+        self.delete_auxiliary_head = delete_auxiliary_head
         if explicit_surprise and explicit_correction_evidence:
             raise ValueError("Use either explicit_surprise or explicit_correction_evidence, not both.")
         self.input_projection = nn.Linear(input_size, d_model)
@@ -195,6 +202,7 @@ class TransformerWrongNoteModel(nn.Module):
         self.kind_head = nn.Linear(d_model, 3)
         self.pitch_head = nn.Linear(d_model, 128)
         self.correction_head = nn.Linear(d_model, 129) if unified_correction else None
+        self.delete_head = nn.Linear(d_model, 1) if delete_auxiliary_head else None
 
     def encode(self, features: torch.Tensor, causal: bool = False) -> torch.Tensor:
         encoded = self.input_projection(features)
@@ -252,6 +260,8 @@ class TransformerWrongNoteModel(nn.Module):
         }
         if self.correction_head is not None:
             outputs["correction_logits"] = self.correction_head(encoded)
+        if self.delete_head is not None:
+            outputs["delete_logits"] = self.delete_head(encoded).squeeze(-1)
         return outputs
 
 
@@ -270,6 +280,7 @@ def build_wrong_note_model(
     correction_evidence_dim: int = 7,
     correction_embedding_dim: int = 32,
     unified_correction: bool = False,
+    delete_auxiliary_head: bool = False,
 ) -> nn.Module:
     if model_type == "bigru":
         return BiGRUWrongNoteModel(
@@ -283,6 +294,7 @@ def build_wrong_note_model(
             correction_evidence_dim=correction_evidence_dim,
             correction_embedding_dim=correction_embedding_dim,
             unified_correction=unified_correction,
+            delete_auxiliary_head=delete_auxiliary_head,
         )
     if model_type == "transformer":
         return TransformerWrongNoteModel(
@@ -298,6 +310,7 @@ def build_wrong_note_model(
             correction_evidence_dim=correction_evidence_dim,
             correction_embedding_dim=correction_embedding_dim,
             unified_correction=unified_correction,
+            delete_auxiliary_head=delete_auxiliary_head,
         )
     raise ValueError(f"Unknown model type: {model_type}")
 

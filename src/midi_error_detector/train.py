@@ -646,8 +646,25 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Predict the expected pitch or NULL for detected errors instead of training keep/replace/delete classes.",
     )
+    parser.add_argument(
+        "--delete-auxiliary-head",
+        action="store_true",
+        help="Add a non-exclusive auxiliary BCE head for notes that should be deleted.",
+    )
     parser.add_argument("--pitch-loss-weight", type=float, default=0.5)
     parser.add_argument("--kind-loss-weight", type=float, default=0.3)
+    parser.add_argument(
+        "--delete-loss-weight",
+        type=float,
+        default=0.0,
+        help="Weight for --delete-auxiliary-head BCE loss.",
+    )
+    parser.add_argument(
+        "--delete-pos-weight",
+        type=float,
+        default=0.0,
+        help="Positive-class weight for the optional delete auxiliary BCE; 0 disables weighting.",
+    )
     parser.add_argument(
         "--det-loss-weight",
         type=float,
@@ -890,6 +907,7 @@ def run_epoch(
     det_threshold: float,
     det_pos_weight: torch.Tensor | None,
     kind_class_weight: torch.Tensor | None,
+    delete_pos_weight: torch.Tensor | None = None,
     threshold_sweep: list[float] | None = None,
     target_precision: float = 0.8,
     ranking_loss_weight: float = 0.0,
@@ -904,6 +922,7 @@ def run_epoch(
     fp_replay_weight: float = 0.4,
     masked_pitch_loss_weight: float = 0.0,
     masked_pitch_rate: float = 0.15,
+    delete_loss_weight: float = 0.0,
     explicit_surprise: bool = False,
     explicit_correction_evidence: bool = False,
     surprise_train_mask_rate: float = 0.25,
@@ -928,12 +947,18 @@ def run_epoch(
         directional_models[0].eval()
         directional_models[2].eval()
     unified_correction = bool(getattr(model, "unified_correction", False))
+    delete_auxiliary = bool(getattr(model, "delete_auxiliary_head", False))
     totals = {
         "loss": 0.0,
         "det_loss": 0.0,
         "ranking_loss": 0.0,
         "masked_pitch_loss": 0.0,
         "masked_pitch_notes": 0.0,
+        "delete_loss": 0.0,
+        "delete_aux_tp": 0.0,
+        "delete_aux_fp": 0.0,
+        "delete_aux_tn": 0.0,
+        "delete_aux_fn": 0.0,
         "surprise_clean_sum": 0.0,
         "surprise_error_sum": 0.0,
         "surprise_clean_notes": 0.0,
@@ -1028,6 +1053,16 @@ def run_epoch(
                 pos_weight=det_pos_weight,
                 sample_weight=det_weight,
             )
+            delete_targets_float = (error_kind == 2).float()
+            if delete_auxiliary and delete_loss_weight > 0.0:
+                delete_loss = masked_bce_with_logits(
+                outputs["delete_logits"],
+                delete_targets_float,
+                mask,
+                pos_weight=delete_pos_weight,
+            )
+            else:
+                delete_loss = features.sum() * 0.0
             if unified_correction:
                 pitch_mask = mask * is_error
                 pitch_loss = masked_pitch_loss(
@@ -1063,6 +1098,7 @@ def run_epoch(
                 det_loss_weight * det_loss
                 + pitch_loss_weight * pitch_loss
                 + kind_loss_weight * kind_loss
+                + delete_loss_weight * delete_loss
                 + ranking_loss_weight * ranking_loss
                 + masked_pitch_loss_weight * masked_recon_loss
             )
@@ -1099,6 +1135,10 @@ def run_epoch(
         clean_predictions = (~error_predictions) & valid_mask
         replace_targets = (error_kind == 1) & valid_mask
         delete_targets = (error_kind == 2) & valid_mask
+        if delete_auxiliary:
+            delete_aux_predictions = (torch.sigmoid(outputs["delete_logits"]) >= 0.5) & valid_mask
+        else:
+            delete_aux_predictions = torch.zeros_like(valid_mask)
         if unified_correction:
             correction_predictions = outputs["correction_logits"].argmax(dim=-1)
             correction_top3 = outputs["correction_logits"].topk(k=3, dim=-1).indices
@@ -1120,6 +1160,7 @@ def run_epoch(
         totals["ranking_loss"] += float(ranking_loss.detach()) * float(mask.sum())
         totals["masked_pitch_loss"] += float(masked_recon_loss.detach()) * max(masked_pitch_notes, 1.0)
         totals["masked_pitch_notes"] += masked_pitch_notes
+        totals["delete_loss"] += float(delete_loss.detach()) * float(mask.sum())
         available_mask = surprise_available.bool() & valid_mask
         totals["surprise_clean_sum"] += float((surprise.detach() * (available_mask & clean_targets).float()).sum())
         totals["surprise_error_sum"] += float((surprise.detach() * (available_mask & error_targets).float()).sum())
@@ -1137,6 +1178,10 @@ def run_epoch(
         totals["kind_correct"] += float((kind_correct & valid_mask).sum())
         totals["replace_kind_correct"] += float((kind_correct & replace_targets).sum())
         totals["delete_kind_correct"] += float((kind_correct & delete_targets).sum())
+        totals["delete_aux_tp"] += float((delete_aux_predictions & delete_targets).sum())
+        totals["delete_aux_fp"] += float((delete_aux_predictions & valid_mask & ~delete_targets).sum())
+        totals["delete_aux_tn"] += float(((~delete_aux_predictions) & valid_mask & ~delete_targets).sum())
+        totals["delete_aux_fn"] += float(((~delete_aux_predictions) & delete_targets).sum())
         totals["tp"] += float((error_predictions & error_targets).sum())
         totals["fp"] += float((error_predictions & clean_targets).sum())
         totals["tn"] += float((clean_predictions & clean_targets).sum())
@@ -1212,6 +1257,12 @@ def run_epoch(
     replace_kind_acc = totals["replace_kind_correct"] / replace_notes
     replace_pitch_top3 = totals["replace_pitch_top3"] / replace_notes
     precision_shortfall = max(0.0, target_precision - best_f0_5_precision)
+    delete_aux_precision = totals["delete_aux_tp"] / max(totals["delete_aux_tp"] + totals["delete_aux_fp"], 1.0)
+    delete_aux_recall = totals["delete_aux_tp"] / max(totals["delete_aux_tp"] + totals["delete_aux_fn"], 1.0)
+    delete_aux_f1 = 2.0 * delete_aux_precision * delete_aux_recall / max(
+        delete_aux_precision + delete_aux_recall,
+        1e-12,
+    )
     if unified_correction:
         correction_top3 = totals["correction_top3"] / correction_notes
         null_acc = totals["null_correct"] / delete_notes
@@ -1234,6 +1285,10 @@ def run_epoch(
         "det_loss": totals["det_loss"] / notes,
         "ranking_loss": totals["ranking_loss"] / notes,
         "masked_pitch_loss": totals["masked_pitch_loss"] / max(totals["masked_pitch_notes"], 1.0),
+        "delete_loss": totals["delete_loss"] / notes,
+        "delete_aux_precision": delete_aux_precision if delete_auxiliary else 0.0,
+        "delete_aux_recall": delete_aux_recall if delete_auxiliary else 0.0,
+        "delete_aux_f1": delete_aux_f1 if delete_auxiliary else 0.0,
         "mean_clean_surprise": totals["surprise_clean_sum"] / max(totals["surprise_clean_notes"], 1.0),
         "mean_error_surprise": totals["surprise_error_sum"] / max(totals["surprise_error_notes"], 1.0),
         "pitch_loss": totals["pitch_loss"] / correction_notes,
@@ -1316,6 +1371,7 @@ def main() -> None:
         correction_evidence_dim=args.correction_evidence_dim,
         correction_embedding_dim=args.correction_embedding_dim,
         unified_correction=args.unified_correction,
+        delete_auxiliary_head=args.delete_auxiliary_head,
     ).to(device)
     if args.init_checkpoint:
         checkpoint = torch.load(args.init_checkpoint, map_location=device)
@@ -1447,12 +1503,15 @@ def main() -> None:
             min_lr=args.min_lr,
         )
     det_pos_weight = torch.tensor(args.det_pos_weight, device=device) if args.det_pos_weight > 0 else None
+    delete_pos_weight = torch.tensor(args.delete_pos_weight, device=device) if args.delete_pos_weight > 0 else None
     kind_class_weight = torch.tensor(args.kind_class_weights, dtype=torch.float32, device=device)
     best_valid = float("inf") if args.save_metric == "loss" else -float("inf")
     print(
         f"loss weights: det_pos_weight={args.det_pos_weight}, "
         f"det_loss_weight={args.det_loss_weight}, pitch_loss_weight={args.pitch_loss_weight}, "
         f"kind_loss_weight={args.kind_loss_weight}, kind_class_weights={args.kind_class_weights}, "
+        f"delete_loss_weight={args.delete_loss_weight}, delete_auxiliary_head={args.delete_auxiliary_head}, "
+        f"delete_pos_weight={args.delete_pos_weight}, "
         f"masked_pitch_loss_weight={args.masked_pitch_loss_weight}, masked_pitch_rate={args.masked_pitch_rate}, "
         f"clean_mask_batches_per_epoch={args.clean_mask_batches_per_epoch}, ranking_loss_weight={args.ranking_loss_weight}, "
         f"explicit_surprise={args.explicit_surprise}, surprise_train_mask_rate={args.surprise_train_mask_rate}, "
@@ -1506,6 +1565,7 @@ def main() -> None:
             det_threshold=args.det_threshold,
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
+            delete_pos_weight=delete_pos_weight,
             threshold_sweep=None,
             target_precision=args.target_precision,
             ranking_loss_weight=args.ranking_loss_weight,
@@ -1513,6 +1573,7 @@ def main() -> None:
             ranking_top_k=args.ranking_top_k,
             masked_pitch_loss_weight=args.masked_pitch_loss_weight,
             masked_pitch_rate=args.masked_pitch_rate,
+            delete_loss_weight=args.delete_loss_weight,
         )
         print(f"stage=clean epoch={epoch}/{args.clean_epochs} train={train_metrics}", flush=True)
 
@@ -1578,6 +1639,7 @@ def main() -> None:
                 det_threshold=args.det_threshold,
                 det_pos_weight=None,
                 kind_class_weight=kind_class_weight,
+                delete_pos_weight=None,
                 threshold_sweep=None,
                 target_precision=args.target_precision,
                 ranking_loss_weight=0.0,
@@ -1585,6 +1647,7 @@ def main() -> None:
                 ranking_top_k=args.ranking_top_k,
                 masked_pitch_loss_weight=args.masked_pitch_loss_weight,
                 masked_pitch_rate=args.masked_pitch_rate,
+                delete_loss_weight=0.0,
                 max_batches=args.clean_mask_batches_per_epoch,
             )
             print(
@@ -1609,12 +1672,14 @@ def main() -> None:
                     det_threshold=args.det_threshold,
                     det_pos_weight=det_pos_weight,
                     kind_class_weight=kind_class_weight,
+                    delete_pos_weight=delete_pos_weight,
                     threshold_sweep=None,
                     target_precision=args.target_precision,
                     ranking_loss_weight=args.ranking_loss_weight,
                     ranking_margin=args.ranking_margin,
                     ranking_top_k=args.ranking_top_k,
                     masked_pitch_loss_weight=0.0,
+                    delete_loss_weight=args.delete_loss_weight,
                     explicit_surprise=args.explicit_surprise,
                     explicit_correction_evidence=args.explicit_correction_evidence,
                     surprise_train_mask_rate=args.surprise_train_mask_rate,
@@ -1645,6 +1710,7 @@ def main() -> None:
             det_threshold=args.det_threshold,
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
+            delete_pos_weight=delete_pos_weight,
             threshold_sweep=None,
             target_precision=args.target_precision,
             ranking_loss_weight=args.ranking_loss_weight,
@@ -1664,6 +1730,7 @@ def main() -> None:
             fn_replay_weight=args.fn_replay_weight,
             fp_replay_weight=args.fp_replay_weight,
             masked_pitch_loss_weight=0.0,
+            delete_loss_weight=args.delete_loss_weight,
             explicit_surprise=args.explicit_surprise,
             explicit_correction_evidence=args.explicit_correction_evidence,
             surprise_train_mask_rate=args.surprise_train_mask_rate,
@@ -1706,12 +1773,14 @@ def main() -> None:
             det_threshold=args.det_threshold,
             det_pos_weight=det_pos_weight,
             kind_class_weight=kind_class_weight,
+            delete_pos_weight=delete_pos_weight,
             threshold_sweep=args.threshold_sweep,
             target_precision=args.target_precision,
             ranking_loss_weight=0.0,
             ranking_margin=args.ranking_margin,
             ranking_top_k=args.ranking_top_k,
             masked_pitch_loss_weight=0.0,
+            delete_loss_weight=args.delete_loss_weight,
             explicit_surprise=args.explicit_surprise,
             explicit_correction_evidence=args.explicit_correction_evidence,
             surprise_train_mask_rate=args.surprise_train_mask_rate,

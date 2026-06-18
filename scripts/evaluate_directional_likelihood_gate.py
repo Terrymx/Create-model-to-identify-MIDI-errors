@@ -49,6 +49,8 @@ def model_args(checkpoint: dict) -> SimpleNamespace:
         explicit_surprise=bool(raw.get("explicit_surprise", False)),
         surprise_embedding_dim=int(raw.get("surprise_embedding_dim", 16)),
         safe_feature_columns=list(raw.get("safe_feature_columns", DIRECTIONAL_SAFE_FEATURE_COLUMNS)),
+        unified_correction=bool(raw.get("unified_correction", False)),
+        delete_auxiliary_head=bool(raw.get("delete_auxiliary_head", False)),
     )
 
 
@@ -73,6 +75,8 @@ def load_model(
         dropout=args.dropout,
         explicit_surprise=require_explicit_surprise,
         surprise_embedding_dim=args.surprise_embedding_dim,
+        unified_correction=args.unified_correction,
+        delete_auxiliary_head=args.delete_auxiliary_head,
     ).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
