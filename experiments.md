@@ -1729,3 +1729,70 @@ The first run exposed a CPU/GPU indexing bug in the metadata feature path. The
 script has been fixed and relaunched on the remote training host. Its results
 will determine whether improved Stage 2 ranking can move from the current
 `P=0.8031, R=0.5762` frontier to `R >= 0.60`.
+
+## 2026-06-19 - Theory Interaction Result and Voice-Aware Follow-up
+
+The focused theory-interaction verifier completed with:
+
+- candidate thresholds: three-class `0.60`, binary `0.50`
+- candidate recall ceiling: `0.7284`
+- best calibrated result:
+  - verifier: histogram gradient boosting
+  - calibration: candidate-density adjustment `alpha=0.06`
+  - precision: `0.8001`
+  - recall: `0.5932`
+
+This does not improve the established frozen-context result
+`P=0.8008, R=0.5963`. The 57 theory interaction features are retained as a
+negative ablation rather than replacing the current best system.
+
+The next experiment tests whether the existing melodic and ornament features are
+being degraded by polyphonic event ordering. Adjacent MIDI events frequently
+belong to different voices, so global `prev/next`, passing-tone, neighbor-tone,
+and resolution features can describe a false melodic path.
+
+Two lightweight offline voice-assignment methods will be evaluated in parallel:
+
+1. onset-group minimum-cost matching:
+   - globally match each onset group to active voice tracks;
+   - penalize pitch distance, long gaps, overlap conflicts, crossings, and abrupt
+     direction changes;
+2. whole-piece beam/DP optimization:
+   - retain several assignment hypotheses across onset groups;
+   - optimize longer-range track continuity and crossing stability.
+
+Both methods output the same candidate-level voice evidence:
+
+- assignment confidence and uncertainty;
+- melody, bass, and inner-voice role;
+- previous and next same-voice pitch interval and time gap;
+- same-voice step-in/step-out;
+- passing, neighbor, and resolution evidence;
+- track length, stability, and crossing evidence.
+
+Voice assignment is auxiliary evidence only. Low-confidence assignments are
+masked or down-weighted rather than forced.
+
+Important evaluation correction:
+
+- the standard dataset injects corruptions independently inside overlapping
+  windows;
+- whole-piece voice assignment requires one consistent observed MIDI sequence;
+- this experiment therefore corrupts each complete piece once with a fixed seed,
+  then slices overlapping windows;
+- each run trains and evaluates both a no-voice baseline and its voice-aware
+  verifier on exactly the same piece-consistent candidates.
+
+Primary metric:
+
+`maximize recall subject to precision >= 0.80`
+
+Decision rules:
+
+- preserve a method only if it improves its matched no-voice baseline;
+- compare against the historical `R=0.5963` only as a secondary reference because
+  the piece-consistent corruption protocol is stricter and scientifically cleaner;
+- if either lightweight method improves verifier ranking, integrate its
+  confidence-weighted voice features into the detector and retrain;
+- if neither improves, use the assignment outputs for error analysis before
+  attempting a learned voice-separation model.

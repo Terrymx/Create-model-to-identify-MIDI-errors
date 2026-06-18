@@ -50,6 +50,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-runs", type=int, default=8)
     parser.add_argument("--max-validation-files", type=int, default=None)
     parser.add_argument("--max-test-files", type=int, default=None)
+    parser.add_argument(
+        "--voice-method",
+        choices=["onset_matching", "global_beam"],
+        default="onset_matching",
+    )
+    parser.add_argument("--voice-beam-width", type=int, default=12)
     return parser.parse_args()
 
 
@@ -66,7 +72,7 @@ def select_candidate_runs(context: dict, max_runs: int, target_precision: float)
     for run_key, block in context["runs"].items():
         three_threshold, binary_threshold = _parse_run_key(run_key)
         for model_name, row in block["models"].items():
-            if not model_name.startswith("hist_gradient_boosting"):
+            if "hist_gradient_boosting" not in model_name:
                 continue
             frontier = row["test_frontier"]
             selected = row["selected_test"]
@@ -96,7 +102,8 @@ def apply_normalization(features: torch.Tensor, normalization: list[list[float]]
 
 
 def predict_scores(model, features: torch.Tensor) -> np.ndarray:
-    return model.predict_proba(features.numpy())[:, 1].astype(np.float32)
+    model_features = features[:, : int(model.n_features_in_)]
+    return model.predict_proba(model_features.numpy())[:, 1].astype(np.float32)
 
 
 def row_at_threshold(scores: np.ndarray, labels: np.ndarray, total_errors: int, threshold: float) -> dict:
@@ -262,7 +269,7 @@ def main() -> None:
     print("selected calibration runs:", selected_runs, flush=True)
     for run in selected_runs:
         print(f"calibrating {run.key} {run.model_name}", flush=True)
-        calibration_x, calibration_y, _, calibration_stats, calibration_file_ids, calibration_pos, calibration_counts, calibration_score_columns = collect_context_candidates(
+        calibration_x, calibration_y, _, calibration_stats, calibration_file_ids, calibration_pos, calibration_counts, calibration_score_columns, calibration_voice = collect_context_candidates(
             models,
             make_loader(validation, calibration_indices, args.batch_size),
             device,
@@ -271,7 +278,7 @@ def main() -> None:
             run.binary_threshold,
             f"collect calibration {run.key}",
         )
-        test_x, test_y, _, test_stats, test_file_ids, test_pos, test_counts, test_score_columns = collect_context_candidates(
+        test_x, test_y, _, test_stats, test_file_ids, test_pos, test_counts, test_score_columns, test_voice = collect_context_candidates(
             models,
             make_loader(test, list(range(len(test))), args.batch_size),
             device,
@@ -294,6 +301,8 @@ def main() -> None:
             test_counts,
             test_score_columns,
         )
+        calibration_x = torch.cat([calibration_x, calibration_voice], dim=1)
+        test_x = torch.cat([test_x, test_voice], dim=1)
         normalization = context["runs"][run.key]["normalization"]
         calibration_x = apply_normalization(calibration_x, normalization)
         test_x = apply_normalization(test_x, normalization)
@@ -368,12 +377,20 @@ def main() -> None:
             "strategies": strategies,
             "calibration_file_ids": calibration_files,
         }
-        partial = {"target_precision": args.target_precision, "runs": results}
+        partial = {
+            "target_precision": args.target_precision,
+            "voice_method": args.voice_method,
+            "runs": results,
+        }
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(json.dumps(partial, indent=2), encoding="utf-8")
         write_markdown(Path(args.output_md), partial)
 
-    result = {"target_precision": args.target_precision, "runs": results}
+    result = {
+        "target_precision": args.target_precision,
+        "voice_method": args.voice_method,
+        "runs": results,
+    }
     Path(args.output_json).write_text(json.dumps(result, indent=2), encoding="utf-8")
     write_markdown(Path(args.output_md), result)
     print(json.dumps(result, indent=2), flush=True)

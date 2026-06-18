@@ -1,0 +1,4345 @@
+{
+  "target_precision": 0.8,
+  "runs": {
+    "three=0.60,binary=0.50/hist_gradient_boosting": {
+      "candidate_recall_ceiling": 0.7284020683566654,
+      "candidate_precision": 0.5638484818900713,
+      "strategies": {
+        "raw": {
+          "name": "raw",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3880538046360016,
+                "tp": 1385,
+                "fp": 344,
+                "fn": 1217,
+                "precision": 0.8010410641989589,
+                "recall": 0.53228285933897,
+                "f1": 0.6395751558531517
+              },
+              "selected_test": {
+                "threshold": 0.3880538046360016,
+                "tp": 9655,
+                "fp": 2687,
+                "fn": 6203,
+                "precision": 0.7822881218603144,
+                "recall": 0.6088409635515197,
+                "f1": 0.6847517730496454
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.42059704661369324,
+                "tp": 1346,
+                "fp": 314,
+                "fn": 1256,
+                "precision": 0.810843373493976,
+                "recall": 0.5172943889315911,
+                "f1": 0.6316283435007038
+              },
+              "selected_test": {
+                "threshold": 0.42059704661369324,
+                "tp": 9429,
+                "fp": 2383,
+                "fn": 6429,
+                "precision": 0.7982560108364375,
+                "recall": 0.5945894816496405,
+                "f1": 0.6815323455005421
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.44461673498153687,
+                "tp": 1324,
+                "fp": 285,
+                "fn": 1278,
+                "precision": 0.8228713486637663,
+                "recall": 0.5088393543428132,
+                "f1": 0.6288292567086202
+              },
+              "selected_test": {
+                "threshold": 0.44461673498153687,
+                "tp": 9268,
+                "fp": 2200,
+                "fn": 6590,
+                "precision": 0.8081618416463202,
+                "recall": 0.5844368772859124,
+                "f1": 0.6783283319915099
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47950857877731323,
+                "tp": 1272,
+                "fp": 255,
+                "fn": 1330,
+                "precision": 0.8330058939096268,
+                "recall": 0.4888547271329746,
+                "f1": 0.6161298135141681
+              },
+              "selected_test": {
+                "threshold": 0.47950857877731323,
+                "tp": 9047,
+                "fp": 1944,
+                "fn": 6811,
+                "precision": 0.8231280138294969,
+                "recall": 0.5705006936561987,
+                "f1": 0.6739170918842414
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4960116744041443,
+                "tp": 1261,
+                "fp": 240,
+                "fn": 1341,
+                "precision": 0.8401065956029313,
+                "recall": 0.4846272098385857,
+                "f1": 0.6146721910796978
+              },
+              "selected_test": {
+                "threshold": 0.4960116744041443,
+                "tp": 8939,
+                "fp": 1837,
+                "fn": 6919,
+                "precision": 0.8295285820341499,
+                "recall": 0.5636902509774246,
+                "f1": 0.6712472779154465
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5274335741996765,
+                "tp": 1224,
+                "fp": 213,
+                "fn": 1378,
+                "precision": 0.8517745302713987,
+                "recall": 0.4704073789392775,
+                "f1": 0.60609061648923
+              },
+              "selected_test": {
+                "threshold": 0.5274335741996765,
+                "tp": 8738,
+                "fp": 1633,
+                "fn": 7120,
+                "precision": 0.8425417028251856,
+                "recall": 0.5510152604363728,
+                "f1": 0.6662854092798048
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.44461673498153687,
+              "tp": 1324,
+              "fp": 285,
+              "fn": 1278,
+              "precision": 0.8228713486637663,
+              "recall": 0.5088393543428132,
+              "f1": 0.6288292567086202
+            },
+            "selected_test": {
+              "threshold": 0.44461673498153687,
+              "tp": 9268,
+              "fp": 2200,
+              "fn": 6590,
+              "precision": 0.8081618416463202,
+              "recall": 0.5844368772859124,
+              "f1": 0.6783283319915099
+            }
+          }
+        },
+        "density_adjust_alpha=0.02": {
+          "name": "density_adjust_alpha=0.02",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3958180844783783,
+                "tp": 1370,
+                "fp": 341,
+                "fn": 1232,
+                "precision": 0.8007013442431327,
+                "recall": 0.5265180630284396,
+                "f1": 0.6352886621840945
+              },
+              "selected_test": {
+                "threshold": 0.3958180844783783,
+                "tp": 9554,
+                "fp": 2519,
+                "fn": 6304,
+                "precision": 0.7913526049863331,
+                "recall": 0.6024719384537772,
+                "f1": 0.6841144248326233
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.42042914032936096,
+                "tp": 1350,
+                "fp": 310,
+                "fn": 1252,
+                "precision": 0.8132530120481928,
+                "recall": 0.5188316679477325,
+                "f1": 0.6335053965274519
+              },
+              "selected_test": {
+                "threshold": 0.42042914032936096,
+                "tp": 9382,
+                "fp": 2314,
+                "fn": 6476,
+                "precision": 0.8021545827633378,
+                "recall": 0.5916256778912852,
+                "f1": 0.6809900558902519
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4490188956260681,
+                "tp": 1309,
+                "fp": 283,
+                "fn": 1293,
+                "precision": 0.8222361809045227,
+                "recall": 0.5030745580322828,
+                "f1": 0.6242250834525512
+              },
+              "selected_test": {
+                "threshold": 0.4490188956260681,
+                "tp": 9181,
+                "fp": 2089,
+                "fn": 6677,
+                "precision": 0.8146406388642413,
+                "recall": 0.5789506873502334,
+                "f1": 0.6768652314951341
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4743484854698181,
+                "tp": 1279,
+                "fp": 261,
+                "fn": 1323,
+                "precision": 0.8305194805194805,
+                "recall": 0.4915449654112221,
+                "f1": 0.6175760502172862
+              },
+              "selected_test": {
+                "threshold": 0.4743484854698181,
+                "tp": 9043,
+                "fp": 1914,
+                "fn": 6815,
+                "precision": 0.8253171488546135,
+                "recall": 0.5702484550384664,
+                "f1": 0.6744732425881037
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5037876963615417,
+                "tp": 1255,
+                "fp": 234,
+                "fn": 1347,
+                "precision": 0.8428475486903962,
+                "recall": 0.48232129131437357,
+                "f1": 0.613541921290638
+              },
+              "selected_test": {
+                "threshold": 0.5037876963615417,
+                "tp": 8844,
+                "fp": 1732,
+                "fn": 7014,
+                "precision": 0.836232980332829,
+                "recall": 0.5576995838062807,
+                "f1": 0.6691382310660513
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5408127903938293,
+                "tp": 1212,
+                "fp": 208,
+                "fn": 1390,
+                "precision": 0.8535211267605634,
+                "recall": 0.4657955418908532,
+                "f1": 0.6026852312282447
+              },
+              "selected_test": {
+                "threshold": 0.5408127903938293,
+                "tp": 8572,
+                "fp": 1508,
+                "fn": 7286,
+                "precision": 0.8503968253968254,
+                "recall": 0.5405473578004792,
+                "f1": 0.660960752563806
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.42042914032936096,
+              "tp": 1350,
+              "fp": 310,
+              "fn": 1252,
+              "precision": 0.8132530120481928,
+              "recall": 0.5188316679477325,
+              "f1": 0.6335053965274519
+            },
+            "selected_test": {
+              "threshold": 0.42042914032936096,
+              "tp": 9382,
+              "fp": 2314,
+              "fn": 6476,
+              "precision": 0.8021545827633378,
+              "recall": 0.5916256778912852,
+              "f1": 0.6809900558902519
+            }
+          }
+        },
+        "density_adjust_alpha=0.04": {
+          "name": "density_adjust_alpha=0.04",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.39647868275642395,
+                "tp": 1377,
+                "fp": 343,
+                "fn": 1225,
+                "precision": 0.8005813953488372,
+                "recall": 0.5292083013066872,
+                "f1": 0.6372049976862565
+              },
+              "selected_test": {
+                "threshold": 0.39647868275642395,
+                "tp": 9509,
+                "fp": 2458,
+                "fn": 6349,
+                "precision": 0.7946018216762765,
+                "recall": 0.599634254004288,
+                "f1": 0.683486073674753
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4158160090446472,
+                "tp": 1350,
+                "fp": 315,
+                "fn": 1252,
+                "precision": 0.8108108108108109,
+                "recall": 0.5188316679477325,
+                "f1": 0.6327630653855169
+              },
+              "selected_test": {
+                "threshold": 0.4158160090446472,
+                "tp": 9367,
+                "fp": 2300,
+                "fn": 6491,
+                "precision": 0.8028627753492757,
+                "recall": 0.5906797830747887,
+                "f1": 0.6806176203451408
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.44942644238471985,
+                "tp": 1308,
+                "fp": 284,
+                "fn": 1294,
+                "precision": 0.821608040201005,
+                "recall": 0.5026902382782475,
+                "f1": 0.6237482117310443
+              },
+              "selected_test": {
+                "threshold": 0.44942644238471985,
+                "tp": 9149,
+                "fp": 2053,
+                "fn": 6709,
+                "precision": 0.816729155507945,
+                "recall": 0.5769327784083743,
+                "f1": 0.6762010347376202
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47810399532318115,
+                "tp": 1281,
+                "fp": 259,
+                "fn": 1321,
+                "precision": 0.8318181818181818,
+                "recall": 0.4923136049192928,
+                "f1": 0.6185417672621921
+              },
+              "selected_test": {
+                "threshold": 0.47810399532318115,
+                "tp": 8955,
+                "fp": 1833,
+                "fn": 6903,
+                "precision": 0.8300889877641824,
+                "recall": 0.5646992054483542,
+                "f1": 0.672145913082639
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5119521617889404,
+                "tp": 1237,
+                "fp": 235,
+                "fn": 1365,
+                "precision": 0.8403532608695652,
+                "recall": 0.4754035357417371,
+                "f1": 0.6072655866470299
+              },
+              "selected_test": {
+                "threshold": 0.5119521617889404,
+                "tp": 8743,
+                "fp": 1623,
+                "fn": 7115,
+                "precision": 0.8434304456878255,
+                "recall": 0.5513305587085383,
+                "f1": 0.6667937766931056
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5372849702835083,
+                "tp": 1208,
+                "fp": 212,
+                "fn": 1394,
+                "precision": 0.8507042253521127,
+                "recall": 0.4642582628747118,
+                "f1": 0.6006961710591745
+              },
+              "selected_test": {
+                "threshold": 0.5372849702835083,
+                "tp": 8542,
+                "fp": 1496,
+                "fn": 7316,
+                "precision": 0.8509663279537757,
+                "recall": 0.5386555681674864,
+                "f1": 0.6597157862218103
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.4158160090446472,
+              "tp": 1350,
+              "fp": 315,
+              "fn": 1252,
+              "precision": 0.8108108108108109,
+              "recall": 0.5188316679477325,
+              "f1": 0.6327630653855169
+            },
+            "selected_test": {
+              "threshold": 0.4158160090446472,
+              "tp": 9367,
+              "fp": 2300,
+              "fn": 6491,
+              "precision": 0.8028627753492757,
+              "recall": 0.5906797830747887,
+              "f1": 0.6806176203451408
+            }
+          }
+        },
+        "density_adjust_alpha=0.06": {
+          "name": "density_adjust_alpha=0.06",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.40520334243774414,
+                "tp": 1369,
+                "fp": 342,
+                "fn": 1233,
+                "precision": 0.8001168907071888,
+                "recall": 0.5261337432744043,
+                "f1": 0.6348249478321354
+              },
+              "selected_test": {
+                "threshold": 0.40520334243774414,
+                "tp": 9407,
+                "fp": 2351,
+                "fn": 6451,
+                "precision": 0.8000510290865793,
+                "recall": 0.5932021692521124,
+                "f1": 0.6812717265353418
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4286971390247345,
+                "tp": 1337,
+                "fp": 311,
+                "fn": 1265,
+                "precision": 0.8112864077669902,
+                "recall": 0.5138355111452728,
+                "f1": 0.6291764705882353
+              },
+              "selected_test": {
+                "threshold": 0.4286971390247345,
+                "tp": 9246,
+                "fp": 2169,
+                "fn": 6612,
+                "precision": 0.8099868593955322,
+                "recall": 0.5830495648883844,
+                "f1": 0.6780332196678033
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.45321542024612427,
+                "tp": 1307,
+                "fp": 285,
+                "fn": 1295,
+                "precision": 0.8209798994974874,
+                "recall": 0.5023059185242121,
+                "f1": 0.6232713400095374
+              },
+              "selected_test": {
+                "threshold": 0.45321542024612427,
+                "tp": 9073,
+                "fp": 1981,
+                "fn": 6785,
+                "precision": 0.8207888547132259,
+                "recall": 0.5721402446714592,
+                "f1": 0.6742717003567182
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4897622764110565,
+                "tp": 1266,
+                "fp": 257,
+                "fn": 1336,
+                "precision": 0.8312541037426132,
+                "recall": 0.4865488086087625,
+                "f1": 0.6138181818181818
+              },
+              "selected_test": {
+                "threshold": 0.4897622764110565,
+                "tp": 8846,
+                "fp": 1727,
+                "fn": 7012,
+                "precision": 0.8366594154922917,
+                "recall": 0.5578257031151469,
+                "f1": 0.6693655177632326
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5245504379272461,
+                "tp": 1223,
+                "fp": 232,
+                "fn": 1379,
+                "precision": 0.8405498281786942,
+                "recall": 0.4700230591852421,
+                "f1": 0.6029085531180676
+              },
+              "selected_test": {
+                "threshold": 0.5245504379272461,
+                "tp": 8579,
+                "fp": 1537,
+                "fn": 7279,
+                "precision": 0.8480624752866746,
+                "recall": 0.5409887753815109,
+                "f1": 0.6605836605836606
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5507555603981018,
+                "tp": 1195,
+                "fp": 208,
+                "fn": 1407,
+                "precision": 0.8517462580185318,
+                "recall": 0.4592621060722521,
+                "f1": 0.5967540574282147
+              },
+              "selected_test": {
+                "threshold": 0.5507555603981018,
+                "tp": 8395,
+                "fp": 1381,
+                "fn": 7463,
+                "precision": 0.8587356792144026,
+                "recall": 0.5293857989658217,
+                "f1": 0.6549894671139893
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8,
+            "selected_calibration": {
+              "threshold": 0.40520334243774414,
+              "tp": 1369,
+              "fp": 342,
+              "fn": 1233,
+              "precision": 0.8001168907071888,
+              "recall": 0.5261337432744043,
+              "f1": 0.6348249478321354
+            },
+            "selected_test": {
+              "threshold": 0.40520334243774414,
+              "tp": 9407,
+              "fp": 2351,
+              "fn": 6451,
+              "precision": 0.8000510290865793,
+              "recall": 0.5932021692521124,
+              "f1": 0.6812717265353418
+            }
+          }
+        },
+        "density_adjust_alpha=0.08": {
+          "name": "density_adjust_alpha=0.08",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.4110053777694702,
+                "tp": 1364,
+                "fp": 337,
+                "fn": 1238,
+                "precision": 0.8018812463256908,
+                "recall": 0.5242121445042275,
+                "f1": 0.6339762956077154
+              },
+              "selected_test": {
+                "threshold": 0.4110053777694702,
+                "tp": 9331,
+                "fp": 2251,
+                "fn": 6527,
+                "precision": 0.8056466931445346,
+                "recall": 0.5884096355151974,
+                "f1": 0.6801020408163265
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4381699562072754,
+                "tp": 1334,
+                "fp": 309,
+                "fn": 1268,
+                "precision": 0.8119293974437005,
+                "recall": 0.5126825518831668,
+                "f1": 0.6285041224970553
+              },
+              "selected_test": {
+                "threshold": 0.4381699562072754,
+                "tp": 9134,
+                "fp": 2043,
+                "fn": 6724,
+                "precision": 0.8172139214458263,
+                "recall": 0.5759868835918779,
+                "f1": 0.6757166635842425
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.46718284487724304,
+                "tp": 1296,
+                "fp": 279,
+                "fn": 1306,
+                "precision": 0.8228571428571428,
+                "recall": 0.4980784012298232,
+                "f1": 0.6205410581757242
+              },
+              "selected_test": {
+                "threshold": 0.46718284487724304,
+                "tp": 8947,
+                "fp": 1856,
+                "fn": 6911,
+                "precision": 0.8281958715171711,
+                "recall": 0.5641947282128894,
+                "f1": 0.671167623119913
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4896538257598877,
+                "tp": 1268,
+                "fp": 257,
+                "fn": 1334,
+                "precision": 0.8314754098360656,
+                "recall": 0.4873174481168332,
+                "f1": 0.6144899442694451
+              },
+              "selected_test": {
+                "threshold": 0.4896538257598877,
+                "tp": 8791,
+                "fp": 1716,
+                "fn": 7067,
+                "precision": 0.8366803083658514,
+                "recall": 0.5543574221213268,
+                "f1": 0.666868955054049
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5454897880554199,
+                "tp": 1198,
+                "fp": 222,
+                "fn": 1404,
+                "precision": 0.8436619718309859,
+                "recall": 0.46041506533435816,
+                "f1": 0.5957235206364992
+              },
+              "selected_test": {
+                "threshold": 0.5454897880554199,
+                "tp": 8376,
+                "fp": 1384,
+                "fn": 7482,
+                "precision": 0.8581967213114754,
+                "recall": 0.5281876655315929,
+                "f1": 0.6539152158638457
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.557066798210144,
+                "tp": 1190,
+                "fp": 206,
+                "fn": 1412,
+                "precision": 0.8524355300859598,
+                "recall": 0.4573405073020753,
+                "f1": 0.5952976488244122
+              },
+              "selected_test": {
+                "threshold": 0.557066798210144,
+                "tp": 8287,
+                "fp": 1317,
+                "fn": 7571,
+                "precision": 0.8628696376509788,
+                "recall": 0.5225753562870475,
+                "f1": 0.6509307988374834
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8,
+            "selected_calibration": {
+              "threshold": 0.4110053777694702,
+              "tp": 1364,
+              "fp": 337,
+              "fn": 1238,
+              "precision": 0.8018812463256908,
+              "recall": 0.5242121445042275,
+              "f1": 0.6339762956077154
+            },
+            "selected_test": {
+              "threshold": 0.4110053777694702,
+              "tp": 9331,
+              "fp": 2251,
+              "fn": 6527,
+              "precision": 0.8056466931445346,
+              "recall": 0.5884096355151974,
+              "f1": 0.6801020408163265
+            }
+          }
+        },
+        "density_adjust_alpha=0.10": {
+          "name": "density_adjust_alpha=0.10",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.41578468680381775,
+                "tp": 1358,
+                "fp": 339,
+                "fn": 1244,
+                "precision": 0.8002357100766058,
+                "recall": 0.5219062259800153,
+                "f1": 0.6317748313561293
+              },
+              "selected_test": {
+                "threshold": 0.41578468680381775,
+                "tp": 9259,
+                "fp": 2199,
+                "fn": 6599,
+                "precision": 0.8080816896491534,
+                "recall": 0.5838693403960147,
+                "f1": 0.6779177039097964
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.450731486082077,
+                "tp": 1319,
+                "fp": 307,
+                "fn": 1283,
+                "precision": 0.8111931119311193,
+                "recall": 0.5069177555726364,
+                "f1": 0.6239356669820245
+              },
+              "selected_test": {
+                "threshold": 0.450731486082077,
+                "tp": 9015,
+                "fp": 1939,
+                "fn": 6843,
+                "precision": 0.8229870366989228,
+                "recall": 0.5684827847143398,
+                "f1": 0.6724600924958974
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4731738269329071,
+                "tp": 1291,
+                "fp": 283,
+                "fn": 1311,
+                "precision": 0.8202033036848793,
+                "recall": 0.49615680245964644,
+                "f1": 0.6182950191570882
+              },
+              "selected_test": {
+                "threshold": 0.4731738269329071,
+                "tp": 8869,
+                "fp": 1789,
+                "fn": 6989,
+                "precision": 0.8321448677050103,
+                "recall": 0.5592760751671081,
+                "f1": 0.6689545934530096
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.5227919816970825,
+                "tp": 1228,
+                "fp": 244,
+                "fn": 1374,
+                "precision": 0.8342391304347826,
+                "recall": 0.4719446579554189,
+                "f1": 0.602847324496809
+              },
+              "selected_test": {
+                "threshold": 0.5227919816970825,
+                "tp": 8497,
+                "fp": 1493,
+                "fn": 7361,
+                "precision": 0.8505505505505505,
+                "recall": 0.5358178837179972,
+                "f1": 0.6574589910244506
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5460846424102783,
+                "tp": 1199,
+                "fp": 221,
+                "fn": 1403,
+                "precision": 0.8443661971830986,
+                "recall": 0.4607993850883935,
+                "f1": 0.5962207856787668
+              },
+              "selected_test": {
+                "threshold": 0.5460846424102783,
+                "tp": 8301,
+                "fp": 1376,
+                "fn": 7557,
+                "precision": 0.8578071716441046,
+                "recall": 0.5234581914491109,
+                "f1": 0.6501664382220481
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.560011625289917,
+                "tp": 1181,
+                "fp": 208,
+                "fn": 1421,
+                "precision": 0.8502519798416127,
+                "recall": 0.4538816295157571,
+                "f1": 0.591831621147582
+              },
+              "selected_test": {
+                "threshold": 0.560011625289917,
+                "tp": 8186,
+                "fp": 1285,
+                "fn": 7672,
+                "precision": 0.864322669200718,
+                "recall": 0.516206331189305,
+                "f1": 0.6463737218208377
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8,
+            "selected_calibration": {
+              "threshold": 0.41578468680381775,
+              "tp": 1358,
+              "fp": 339,
+              "fn": 1244,
+              "precision": 0.8002357100766058,
+              "recall": 0.5219062259800153,
+              "f1": 0.6317748313561293
+            },
+            "selected_test": {
+              "threshold": 0.41578468680381775,
+              "tp": 9259,
+              "fp": 2199,
+              "fn": 6599,
+              "precision": 0.8080816896491534,
+              "recall": 0.5838693403960147,
+              "f1": 0.6779177039097964
+            }
+          }
+        },
+        "rank_blend_beta=0.10": {
+          "name": "rank_blend_beta=0.10",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.395949125289917,
+                "tp": 1382,
+                "fp": 344,
+                "fn": 1220,
+                "precision": 0.8006952491309386,
+                "recall": 0.531129900076864,
+                "f1": 0.6386321626617376
+              },
+              "selected_test": {
+                "threshold": 0.395949125289917,
+                "tp": 9612,
+                "fp": 2634,
+                "fn": 6246,
+                "precision": 0.7849093581577657,
+                "recall": 0.6061293984108967,
+                "f1": 0.6840307429547395
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4290160834789276,
+                "tp": 1342,
+                "fp": 311,
+                "fn": 1260,
+                "precision": 0.8118572292800968,
+                "recall": 0.5157571099154497,
+                "f1": 0.6307873090481787
+              },
+              "selected_test": {
+                "threshold": 0.4290160834789276,
+                "tp": 9380,
+                "fp": 2330,
+                "fn": 6478,
+                "precision": 0.8010247651579846,
+                "recall": 0.591499558582419,
+                "f1": 0.6804991294254208
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4455495774745941,
+                "tp": 1327,
+                "fp": 291,
+                "fn": 1275,
+                "precision": 0.8201483312731768,
+                "recall": 0.5099923136049193,
+                "f1": 0.6289099526066351
+              },
+              "selected_test": {
+                "threshold": 0.4455495774745941,
+                "tp": 9265,
+                "fp": 2192,
+                "fn": 6593,
+                "precision": 0.8086759186523522,
+                "recall": 0.5842476983226131,
+                "f1": 0.6783818414790408
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47815677523612976,
+                "tp": 1279,
+                "fp": 261,
+                "fn": 1323,
+                "precision": 0.8305194805194805,
+                "recall": 0.4915449654112221,
+                "f1": 0.6175760502172862
+              },
+              "selected_test": {
+                "threshold": 0.47815677523612976,
+                "tp": 9044,
+                "fp": 1953,
+                "fn": 6814,
+                "precision": 0.8224061107574793,
+                "recall": 0.5703115146928995,
+                "f1": 0.6735431018432322
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5034167766571045,
+                "tp": 1254,
+                "fp": 238,
+                "fn": 1348,
+                "precision": 0.8404825737265416,
+                "recall": 0.4819369715603382,
+                "f1": 0.6126038104543234
+              },
+              "selected_test": {
+                "threshold": 0.5034167766571045,
+                "tp": 8869,
+                "fp": 1774,
+                "fn": 6989,
+                "precision": 0.833317673588274,
+                "recall": 0.5592760751671081,
+                "f1": 0.6693332327081998
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5364837050437927,
+                "tp": 1216,
+                "fp": 208,
+                "fn": 1386,
+                "precision": 0.8539325842696629,
+                "recall": 0.46733282090699463,
+                "f1": 0.604073522106309
+              },
+              "selected_test": {
+                "threshold": 0.5364837050437927,
+                "tp": 8625,
+                "fp": 1567,
+                "fn": 7233,
+                "precision": 0.846251962323391,
+                "recall": 0.5438895194854332,
+                "f1": 0.6621880998080614
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.4290160834789276,
+              "tp": 1342,
+              "fp": 311,
+              "fn": 1260,
+              "precision": 0.8118572292800968,
+              "recall": 0.5157571099154497,
+              "f1": 0.6307873090481787
+            },
+            "selected_test": {
+              "threshold": 0.4290160834789276,
+              "tp": 9380,
+              "fp": 2330,
+              "fn": 6478,
+              "precision": 0.8010247651579846,
+              "recall": 0.591499558582419,
+              "f1": 0.6804991294254208
+            }
+          }
+        },
+        "rank_blend_beta=0.20": {
+          "name": "rank_blend_beta=0.20",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.408643513917923,
+                "tp": 1372,
+                "fp": 339,
+                "fn": 1230,
+                "precision": 0.8018702513150204,
+                "recall": 0.5272867025365103,
+                "f1": 0.6362160908880129
+              },
+              "selected_test": {
+                "threshold": 0.408643513917923,
+                "tp": 9518,
+                "fp": 2539,
+                "fn": 6340,
+                "precision": 0.7894169362196235,
+                "recall": 0.6002017908941859,
+                "f1": 0.6819272792405516
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4363149106502533,
+                "tp": 1340,
+                "fp": 307,
+                "fn": 1262,
+                "precision": 0.8136004857316332,
+                "recall": 0.5149884704073789,
+                "f1": 0.6307366439162155
+              },
+              "selected_test": {
+                "threshold": 0.4363149106502533,
+                "tp": 9331,
+                "fp": 2273,
+                "fn": 6527,
+                "precision": 0.8041192692175112,
+                "recall": 0.5884096355151974,
+                "f1": 0.6795572063214623
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.451636403799057,
+                "tp": 1321,
+                "fp": 288,
+                "fn": 1281,
+                "precision": 0.8210068365444375,
+                "recall": 0.5076863950807071,
+                "f1": 0.6274044170030871
+              },
+              "selected_test": {
+                "threshold": 0.451636403799057,
+                "tp": 9222,
+                "fp": 2153,
+                "fn": 6636,
+                "precision": 0.8107252747252748,
+                "recall": 0.5815361331819902,
+                "f1": 0.6772665516101789
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47772449254989624,
+                "tp": 1290,
+                "fp": 264,
+                "fn": 1312,
+                "precision": 0.8301158301158301,
+                "recall": 0.4957724827056111,
+                "f1": 0.6207892204042349
+              },
+              "selected_test": {
+                "threshold": 0.47772449254989624,
+                "tp": 9043,
+                "fp": 1957,
+                "fn": 6815,
+                "precision": 0.8220909090909091,
+                "recall": 0.5702484550384664,
+                "f1": 0.6733934023382233
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5073174834251404,
+                "tp": 1253,
+                "fp": 236,
+                "fn": 1349,
+                "precision": 0.8415043653458697,
+                "recall": 0.48155265180630286,
+                "f1": 0.6125641652407725
+              },
+              "selected_test": {
+                "threshold": 0.5073174834251404,
+                "tp": 8821,
+                "fp": 1739,
+                "fn": 7037,
+                "precision": 0.8353219696969697,
+                "recall": 0.5562492117543196,
+                "f1": 0.6678022560375502
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5316817164421082,
+                "tp": 1222,
+                "fp": 215,
+                "fn": 1380,
+                "precision": 0.8503827418232429,
+                "recall": 0.46963873943120676,
+                "f1": 0.6051002723446397
+              },
+              "selected_test": {
+                "threshold": 0.5316817164421082,
+                "tp": 8628,
+                "fp": 1583,
+                "fn": 7230,
+                "precision": 0.8449711095876995,
+                "recall": 0.5440786984487325,
+                "f1": 0.6619356323602746
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.4363149106502533,
+              "tp": 1340,
+              "fp": 307,
+              "fn": 1262,
+              "precision": 0.8136004857316332,
+              "recall": 0.5149884704073789,
+              "f1": 0.6307366439162155
+            },
+            "selected_test": {
+              "threshold": 0.4363149106502533,
+              "tp": 9331,
+              "fp": 2273,
+              "fn": 6527,
+              "precision": 0.8041192692175112,
+              "recall": 0.5884096355151974,
+              "f1": 0.6795572063214623
+            }
+          }
+        },
+        "rank_blend_beta=0.30": {
+          "name": "rank_blend_beta=0.30",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.4104556739330292,
+                "tp": 1378,
+                "fp": 344,
+                "fn": 1224,
+                "precision": 0.8002322880371661,
+                "recall": 0.5295926210607225,
+                "f1": 0.637372802960222
+              },
+              "selected_test": {
+                "threshold": 0.4104556739330292,
+                "tp": 9507,
+                "fp": 2548,
+                "fn": 6351,
+                "precision": 0.7886354209871422,
+                "recall": 0.5995081346954219,
+                "f1": 0.6811879769283129
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.43529632687568665,
+                "tp": 1345,
+                "fp": 315,
+                "fn": 1257,
+                "precision": 0.8102409638554217,
+                "recall": 0.5169100691775558,
+                "f1": 0.6311590802440169
+              },
+              "selected_test": {
+                "threshold": 0.43529632687568665,
+                "tp": 9346,
+                "fp": 2305,
+                "fn": 6512,
+                "precision": 0.8021629044717191,
+                "recall": 0.5893555303316937,
+                "f1": 0.679486713439238
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.45675837993621826,
+                "tp": 1320,
+                "fp": 289,
+                "fn": 1282,
+                "precision": 0.8203853325046613,
+                "recall": 0.5073020753266718,
+                "f1": 0.6269294704345761
+              },
+              "selected_test": {
+                "threshold": 0.45675837993621826,
+                "tp": 9182,
+                "fp": 2129,
+                "fn": 6676,
+                "precision": 0.8117761471134294,
+                "recall": 0.5790137470046665,
+                "f1": 0.6759174058669808
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.48512956500053406,
+                "tp": 1286,
+                "fp": 258,
+                "fn": 1316,
+                "precision": 0.832901554404145,
+                "recall": 0.49423520368946966,
+                "f1": 0.6203569705740474
+              },
+              "selected_test": {
+                "threshold": 0.48512956500053406,
+                "tp": 8974,
+                "fp": 1892,
+                "fn": 6884,
+                "precision": 0.8258788882753543,
+                "recall": 0.565897338882583,
+                "f1": 0.6716060469989523
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4996253550052643,
+                "tp": 1266,
+                "fp": 240,
+                "fn": 1336,
+                "precision": 0.8406374501992032,
+                "recall": 0.4865488086087625,
+                "f1": 0.6163583252190847
+              },
+              "selected_test": {
+                "threshold": 0.4996253550052643,
+                "tp": 8859,
+                "fp": 1787,
+                "fn": 6999,
+                "precision": 0.8321435280856659,
+                "recall": 0.5586454786227771,
+                "f1": 0.6685028674916994
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5432093143463135,
+                "tp": 1212,
+                "fp": 210,
+                "fn": 1390,
+                "precision": 0.8523206751054853,
+                "recall": 0.4657955418908532,
+                "f1": 0.6023856858846918
+              },
+              "selected_test": {
+                "threshold": 0.5432093143463135,
+                "tp": 8486,
+                "fp": 1504,
+                "fn": 7372,
+                "precision": 0.8494494494494494,
+                "recall": 0.5351242275192332,
+                "f1": 0.6566078613432375
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.43529632687568665,
+              "tp": 1345,
+              "fp": 315,
+              "fn": 1257,
+              "precision": 0.8102409638554217,
+              "recall": 0.5169100691775558,
+              "f1": 0.6311590802440169
+            },
+            "selected_test": {
+              "threshold": 0.43529632687568665,
+              "tp": 9346,
+              "fp": 2305,
+              "fn": 6512,
+              "precision": 0.8021629044717191,
+              "recall": 0.5893555303316937,
+              "f1": 0.679486713439238
+            }
+          }
+        },
+        "rank_blend_beta=0.40": {
+          "name": "rank_blend_beta=0.40",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.41775450110435486,
+                "tp": 1377,
+                "fp": 344,
+                "fn": 1225,
+                "precision": 0.800116211504939,
+                "recall": 0.5292083013066872,
+                "f1": 0.6370575988896598
+              },
+              "selected_test": {
+                "threshold": 0.41775450110435486,
+                "tp": 9454,
+                "fp": 2511,
+                "fn": 6404,
+                "precision": 0.7901379022147932,
+                "recall": 0.5961659730104679,
+                "f1": 0.6795816410883083
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4426913559436798,
+                "tp": 1341,
+                "fp": 313,
+                "fn": 1261,
+                "precision": 0.8107617896009673,
+                "recall": 0.5153727901614144,
+                "f1": 0.6301691729323308
+              },
+              "selected_test": {
+                "threshold": 0.4426913559436798,
+                "tp": 9288,
+                "fp": 2265,
+                "fn": 6570,
+                "precision": 0.8039470267462997,
+                "recall": 0.5856980703745743,
+                "f1": 0.6776841414030863
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4676281809806824,
+                "tp": 1309,
+                "fp": 285,
+                "fn": 1293,
+                "precision": 0.8212045169385195,
+                "recall": 0.5030745580322828,
+                "f1": 0.6239275500476644
+              },
+              "selected_test": {
+                "threshold": 0.4676281809806824,
+                "tp": 9081,
+                "fp": 2049,
+                "fn": 6777,
+                "precision": 0.8159029649595687,
+                "recall": 0.572644721906924,
+                "f1": 0.6729657625611384
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4925650358200073,
+                "tp": 1284,
+                "fp": 255,
+                "fn": 1318,
+                "precision": 0.834307992202729,
+                "recall": 0.49346656418139895,
+                "f1": 0.6201400627867665
+              },
+              "selected_test": {
+                "threshold": 0.4925650358200073,
+                "tp": 8881,
+                "fp": 1845,
+                "fn": 6977,
+                "precision": 0.8279880663807571,
+                "recall": 0.5600327910203052,
+                "f1": 0.6681462533854952
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5091896057128906,
+                "tp": 1258,
+                "fp": 236,
+                "fn": 1344,
+                "precision": 0.8420348058902276,
+                "recall": 0.48347425057647964,
+                "f1": 0.6142578125
+              },
+              "selected_test": {
+                "threshold": 0.5091896057128906,
+                "tp": 8732,
+                "fp": 1726,
+                "fn": 7126,
+                "precision": 0.8349588831516542,
+                "recall": 0.5506369025097743,
+                "f1": 0.6636266909864721
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5507510304450989,
+                "tp": 1198,
+                "fp": 210,
+                "fn": 1404,
+                "precision": 0.8508522727272727,
+                "recall": 0.46041506533435816,
+                "f1": 0.597506234413965
+              },
+              "selected_test": {
+                "threshold": 0.5507510304450989,
+                "tp": 8366,
+                "fp": 1445,
+                "fn": 7492,
+                "precision": 0.8527163388033839,
+                "recall": 0.527557068987262,
+                "f1": 0.6518368460010128
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.4426913559436798,
+              "tp": 1341,
+              "fp": 313,
+              "fn": 1261,
+              "precision": 0.8107617896009673,
+              "recall": 0.5153727901614144,
+              "f1": 0.6301691729323308
+            },
+            "selected_test": {
+              "threshold": 0.4426913559436798,
+              "tp": 9288,
+              "fp": 2265,
+              "fn": 6570,
+              "precision": 0.8039470267462997,
+              "recall": 0.5856980703745743,
+              "f1": 0.6776841414030863
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.02": {
+          "name": "piece_z_blend_gamma=0.02",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.37961503863334656,
+                "tp": 1384,
+                "fp": 345,
+                "fn": 1218,
+                "precision": 0.8004626951995373,
+                "recall": 0.5318985395849347,
+                "f1": 0.6391133687370123
+              },
+              "selected_test": {
+                "threshold": 0.37961503863334656,
+                "tp": 9656,
+                "fp": 2684,
+                "fn": 6202,
+                "precision": 0.7824959481361426,
+                "recall": 0.6089040232059528,
+                "f1": 0.6848712674657776
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.41441869735717773,
+                "tp": 1348,
+                "fp": 312,
+                "fn": 1254,
+                "precision": 0.8120481927710843,
+                "recall": 0.5180630284396618,
+                "f1": 0.6325668700140779
+              },
+              "selected_test": {
+                "threshold": 0.41441869735717773,
+                "tp": 9425,
+                "fp": 2384,
+                "fn": 6433,
+                "precision": 0.7981200779066814,
+                "recall": 0.5943372430319082,
+                "f1": 0.6813170925651498
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4396636188030243,
+                "tp": 1325,
+                "fp": 284,
+                "fn": 1277,
+                "precision": 0.8234928527035426,
+                "recall": 0.5092236740968485,
+                "f1": 0.6293042032771313
+              },
+              "selected_test": {
+                "threshold": 0.4396636188030243,
+                "tp": 9267,
+                "fp": 2196,
+                "fn": 6591,
+                "precision": 0.8084271133211202,
+                "recall": 0.5843738176314793,
+                "f1": 0.6783792686944108
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.478035569190979,
+                "tp": 1275,
+                "fp": 256,
+                "fn": 1327,
+                "precision": 0.8327890267798824,
+                "recall": 0.4900076863950807,
+                "f1": 0.6169852407452213
+              },
+              "selected_test": {
+                "threshold": 0.478035569190979,
+                "tp": 9031,
+                "fp": 1932,
+                "fn": 6827,
+                "precision": 0.8237708656389674,
+                "recall": 0.5694917391852693,
+                "f1": 0.6734275381231125
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5004809498786926,
+                "tp": 1252,
+                "fp": 237,
+                "fn": 1350,
+                "precision": 0.8408327736736064,
+                "recall": 0.4811683320522675,
+                "f1": 0.6120752872158396
+              },
+              "selected_test": {
+                "threshold": 0.5004809498786926,
+                "tp": 8884,
+                "fp": 1783,
+                "fn": 6974,
+                "precision": 0.8328489734695791,
+                "recall": 0.5602219699836045,
+                "f1": 0.6698586239396795
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5285898447036743,
+                "tp": 1223,
+                "fp": 214,
+                "fn": 1379,
+                "precision": 0.8510786360473208,
+                "recall": 0.4700230591852421,
+                "f1": 0.6055954444169349
+              },
+              "selected_test": {
+                "threshold": 0.5285898447036743,
+                "tp": 8717,
+                "fp": 1620,
+                "fn": 7141,
+                "precision": 0.8432814162716455,
+                "recall": 0.5496910076932778,
+                "f1": 0.665546860087803
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.4396636188030243,
+              "tp": 1325,
+              "fp": 284,
+              "fn": 1277,
+              "precision": 0.8234928527035426,
+              "recall": 0.5092236740968485,
+              "f1": 0.6293042032771313
+            },
+            "selected_test": {
+              "threshold": 0.4396636188030243,
+              "tp": 9267,
+              "fp": 2196,
+              "fn": 6591,
+              "precision": 0.8084271133211202,
+              "recall": 0.5843738176314793,
+              "f1": 0.6783792686944108
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.04": {
+          "name": "piece_z_blend_gamma=0.04",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.37909847497940063,
+                "tp": 1376,
+                "fp": 339,
+                "fn": 1226,
+                "precision": 0.8023323615160349,
+                "recall": 0.5288239815526518,
+                "f1": 0.6374797312948806
+              },
+              "selected_test": {
+                "threshold": 0.37909847497940063,
+                "tp": 9592,
+                "fp": 2626,
+                "fn": 6266,
+                "precision": 0.7850712064167622,
+                "recall": 0.6048682053222348,
+                "f1": 0.6832882176948283
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.41020622849464417,
+                "tp": 1346,
+                "fp": 314,
+                "fn": 1256,
+                "precision": 0.810843373493976,
+                "recall": 0.5172943889315911,
+                "f1": 0.6316283435007038
+              },
+              "selected_test": {
+                "threshold": 0.41020622849464417,
+                "tp": 9412,
+                "fp": 2362,
+                "fn": 6446,
+                "precision": 0.7993884830983523,
+                "recall": 0.5935174675242779,
+                "f1": 0.6812391430225825
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.43236032128334045,
+                "tp": 1327,
+                "fp": 288,
+                "fn": 1275,
+                "precision": 0.821671826625387,
+                "recall": 0.5099923136049193,
+                "f1": 0.629357363054304
+              },
+              "selected_test": {
+                "threshold": 0.43236032128334045,
+                "tp": 9271,
+                "fp": 2203,
+                "fn": 6587,
+                "precision": 0.8080006972285166,
+                "recall": 0.5846260562492117,
+                "f1": 0.6783989462900629
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47674521803855896,
+                "tp": 1274,
+                "fp": 256,
+                "fn": 1328,
+                "precision": 0.8326797385620915,
+                "recall": 0.48962336664104533,
+                "f1": 0.6166505324298162
+              },
+              "selected_test": {
+                "threshold": 0.47674521803855896,
+                "tp": 9012,
+                "fp": 1916,
+                "fn": 6846,
+                "precision": 0.8246705710102489,
+                "recall": 0.5682936057510405,
+                "f1": 0.6728888225192264
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.49942198395729065,
+                "tp": 1252,
+                "fp": 237,
+                "fn": 1350,
+                "precision": 0.8408327736736064,
+                "recall": 0.4811683320522675,
+                "f1": 0.6120752872158396
+              },
+              "selected_test": {
+                "threshold": 0.49942198395729065,
+                "tp": 8876,
+                "fp": 1769,
+                "fn": 6982,
+                "precision": 0.8338186942226398,
+                "recall": 0.5597174927481398,
+                "f1": 0.6698109647964382
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5300070643424988,
+                "tp": 1222,
+                "fp": 214,
+                "fn": 1380,
+                "precision": 0.850974930362117,
+                "recall": 0.46963873943120676,
+                "f1": 0.605250123823675
+              },
+              "selected_test": {
+                "threshold": 0.5300070643424988,
+                "tp": 8698,
+                "fp": 1610,
+                "fn": 7160,
+                "precision": 0.8438106325184322,
+                "recall": 0.548492874259049,
+                "f1": 0.6648322250248413
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.43236032128334045,
+              "tp": 1327,
+              "fp": 288,
+              "fn": 1275,
+              "precision": 0.821671826625387,
+              "recall": 0.5099923136049193,
+              "f1": 0.629357363054304
+            },
+            "selected_test": {
+              "threshold": 0.43236032128334045,
+              "tp": 9271,
+              "fp": 2203,
+              "fn": 6587,
+              "precision": 0.8080006972285166,
+              "recall": 0.5846260562492117,
+              "f1": 0.6783989462900629
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.06": {
+          "name": "piece_z_blend_gamma=0.06",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.37547799944877625,
+                "tp": 1375,
+                "fp": 336,
+                "fn": 1227,
+                "precision": 0.8036236119228521,
+                "recall": 0.5284396617986165,
+                "f1": 0.6376072339438905
+              },
+              "selected_test": {
+                "threshold": 0.37547799944877625,
+                "tp": 9558,
+                "fp": 2583,
+                "fn": 6300,
+                "precision": 0.787249814677539,
+                "recall": 0.6027241770715096,
+                "f1": 0.682738669238187
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4043591320514679,
+                "tp": 1346,
+                "fp": 314,
+                "fn": 1256,
+                "precision": 0.810843373493976,
+                "recall": 0.5172943889315911,
+                "f1": 0.6316283435007038
+              },
+              "selected_test": {
+                "threshold": 0.4043591320514679,
+                "tp": 9401,
+                "fp": 2359,
+                "fn": 6457,
+                "precision": 0.799404761904762,
+                "recall": 0.592823811325514,
+                "f1": 0.6807878919545224
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.42967796325683594,
+                "tp": 1325,
+                "fp": 288,
+                "fn": 1277,
+                "precision": 0.8214507129572226,
+                "recall": 0.5092236740968485,
+                "f1": 0.6287069988137604
+              },
+              "selected_test": {
+                "threshold": 0.42967796325683594,
+                "tp": 9252,
+                "fp": 2183,
+                "fn": 6606,
+                "precision": 0.8090948841276782,
+                "recall": 0.583427922814983,
+                "f1": 0.6779760378118932
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47565215826034546,
+                "tp": 1274,
+                "fp": 254,
+                "fn": 1328,
+                "precision": 0.8337696335078534,
+                "recall": 0.48962336664104533,
+                "f1": 0.6169491525423729
+              },
+              "selected_test": {
+                "threshold": 0.47565215826034546,
+                "tp": 8996,
+                "fp": 1905,
+                "fn": 6862,
+                "precision": 0.8252453903311623,
+                "recall": 0.567284651280111,
+                "f1": 0.6723719122538211
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.49902451038360596,
+                "tp": 1251,
+                "fp": 238,
+                "fn": 1351,
+                "precision": 0.8401611820013432,
+                "recall": 0.48078401229823214,
+                "f1": 0.6115864091909068
+              },
+              "selected_test": {
+                "threshold": 0.49902451038360596,
+                "tp": 8859,
+                "fp": 1764,
+                "fn": 6999,
+                "precision": 0.8339452132166055,
+                "recall": 0.5586454786227771,
+                "f1": 0.6690834938257618
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5326738953590393,
+                "tp": 1222,
+                "fp": 215,
+                "fn": 1380,
+                "precision": 0.8503827418232429,
+                "recall": 0.46963873943120676,
+                "f1": 0.6051002723446397
+              },
+              "selected_test": {
+                "threshold": 0.5326738953590393,
+                "tp": 8664,
+                "fp": 1591,
+                "fn": 7194,
+                "precision": 0.8448561677230619,
+                "recall": 0.5463488460083239,
+                "f1": 0.6635775284341133
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.42967796325683594,
+              "tp": 1325,
+              "fp": 288,
+              "fn": 1277,
+              "precision": 0.8214507129572226,
+              "recall": 0.5092236740968485,
+              "f1": 0.6287069988137604
+            },
+            "selected_test": {
+              "threshold": 0.42967796325683594,
+              "tp": 9252,
+              "fp": 2183,
+              "fn": 6606,
+              "precision": 0.8090948841276782,
+              "recall": 0.583427922814983,
+              "f1": 0.6779760378118932
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.08": {
+          "name": "piece_z_blend_gamma=0.08",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3604603409767151,
+                "tp": 1382,
+                "fp": 345,
+                "fn": 1220,
+                "precision": 0.8002316155182397,
+                "recall": 0.531129900076864,
+                "f1": 0.6384846384846385
+              },
+              "selected_test": {
+                "threshold": 0.3604603409767151,
+                "tp": 9605,
+                "fp": 2638,
+                "fn": 6253,
+                "precision": 0.7845299354733317,
+                "recall": 0.6056879808298651,
+                "f1": 0.6836055656382336
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.3985160291194916,
+                "tp": 1345,
+                "fp": 313,
+                "fn": 1257,
+                "precision": 0.8112183353437877,
+                "recall": 0.5169100691775558,
+                "f1": 0.6314553990610329
+              },
+              "selected_test": {
+                "threshold": 0.3985160291194916,
+                "tp": 9393,
+                "fp": 2343,
+                "fn": 6465,
+                "precision": 0.8003578732106339,
+                "recall": 0.5923193340900492,
+                "f1": 0.6808001739508588
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.42705777287483215,
+                "tp": 1322,
+                "fp": 287,
+                "fn": 1280,
+                "precision": 0.8216283405842137,
+                "recall": 0.5080707148347425,
+                "f1": 0.6278793635715981
+              },
+              "selected_test": {
+                "threshold": 0.42705777287483215,
+                "tp": 9237,
+                "fp": 2159,
+                "fn": 6621,
+                "precision": 0.8105475605475605,
+                "recall": 0.5824820279984866,
+                "f1": 0.6778454538783298
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47462737560272217,
+                "tp": 1274,
+                "fp": 253,
+                "fn": 1328,
+                "precision": 0.8343156516044532,
+                "recall": 0.48962336664104533,
+                "f1": 0.6170985710825866
+              },
+              "selected_test": {
+                "threshold": 0.47462737560272217,
+                "tp": 8982,
+                "fp": 1896,
+                "fn": 6876,
+                "precision": 0.8257032542746828,
+                "recall": 0.5664018161180476,
+                "f1": 0.671903052064632
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.49938124418258667,
+                "tp": 1251,
+                "fp": 238,
+                "fn": 1351,
+                "precision": 0.8401611820013432,
+                "recall": 0.48078401229823214,
+                "f1": 0.6115864091909068
+              },
+              "selected_test": {
+                "threshold": 0.49938124418258667,
+                "tp": 8835,
+                "fp": 1748,
+                "fn": 7023,
+                "precision": 0.8348294434470377,
+                "recall": 0.5571320469163829,
+                "f1": 0.6682803222268446
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5335597991943359,
+                "tp": 1222,
+                "fp": 215,
+                "fn": 1380,
+                "precision": 0.8503827418232429,
+                "recall": 0.46963873943120676,
+                "f1": 0.6051002723446397
+              },
+              "selected_test": {
+                "threshold": 0.5335597991943359,
+                "tp": 8644,
+                "fp": 1577,
+                "fn": 7214,
+                "precision": 0.8457098131298307,
+                "recall": 0.545087652919662,
+                "f1": 0.6629088538670961
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.3985160291194916,
+              "tp": 1345,
+              "fp": 313,
+              "fn": 1257,
+              "precision": 0.8112183353437877,
+              "recall": 0.5169100691775558,
+              "f1": 0.6314553990610329
+            },
+            "selected_test": {
+              "threshold": 0.3985160291194916,
+              "tp": 9393,
+              "fp": 2343,
+              "fn": 6465,
+              "precision": 0.8003578732106339,
+              "recall": 0.5923193340900492,
+              "f1": 0.6808001739508588
+            }
+          }
+        }
+      },
+      "calibration_file_ids": [
+        14,
+        24,
+        30,
+        31,
+        35,
+        37,
+        39,
+        49,
+        53,
+        54,
+        57,
+        61,
+        62,
+        64,
+        66,
+        69,
+        76,
+        78,
+        80,
+        89,
+        95,
+        101,
+        105,
+        108,
+        112,
+        115,
+        116,
+        117,
+        120,
+        123,
+        126,
+        131,
+        134,
+        136
+      ]
+    },
+    "three=0.60,binary=0.50/hist_gradient_boosting_small_leaf": {
+      "candidate_recall_ceiling": 0.7284020683566654,
+      "candidate_precision": 0.5638484818900713,
+      "strategies": {
+        "raw": {
+          "name": "raw",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3932771384716034,
+                "tp": 1387,
+                "fp": 346,
+                "fn": 1215,
+                "precision": 0.8003462204270052,
+                "recall": 0.5330514988470407,
+                "f1": 0.6399077277970012
+              },
+              "selected_test": {
+                "threshold": 0.3932771384716034,
+                "tp": 9614,
+                "fp": 2680,
+                "fn": 6244,
+                "precision": 0.7820074833251993,
+                "recall": 0.6062555177197629,
+                "f1": 0.6830065359477124
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4195336401462555,
+                "tp": 1362,
+                "fp": 315,
+                "fn": 1240,
+                "precision": 0.8121645796064401,
+                "recall": 0.5234435049961568,
+                "f1": 0.6365973358261277
+              },
+              "selected_test": {
+                "threshold": 0.4195336401462555,
+                "tp": 9475,
+                "fp": 2458,
+                "fn": 6383,
+                "precision": 0.7940165926422525,
+                "recall": 0.5974902257535629,
+                "f1": 0.6818754272966069
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.43480947613716125,
+                "tp": 1344,
+                "fp": 293,
+                "fn": 1258,
+                "precision": 0.8210140500916311,
+                "recall": 0.5165257494235204,
+                "f1": 0.6341118188251946
+              },
+              "selected_test": {
+                "threshold": 0.43480947613716125,
+                "tp": 9384,
+                "fp": 2332,
+                "fn": 6474,
+                "precision": 0.800955957664732,
+                "recall": 0.5917517972001514,
+                "f1": 0.6806411837237979
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4649184048175812,
+                "tp": 1310,
+                "fp": 264,
+                "fn": 1292,
+                "precision": 0.832274459974587,
+                "recall": 0.5034588777863183,
+                "f1": 0.6273946360153257
+              },
+              "selected_test": {
+                "threshold": 0.4649184048175812,
+                "tp": 9207,
+                "fp": 2122,
+                "fn": 6651,
+                "precision": 0.8126930885338511,
+                "recall": 0.5805902383654937,
+                "f1": 0.677309007981756
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4846482574939728,
+                "tp": 1284,
+                "fp": 242,
+                "fn": 1318,
+                "precision": 0.8414154652686763,
+                "recall": 0.49346656418139895,
+                "f1": 0.6220930232558141
+              },
+              "selected_test": {
+                "threshold": 0.4846482574939728,
+                "tp": 9103,
+                "fp": 1995,
+                "fn": 6755,
+                "precision": 0.8202378806992251,
+                "recall": 0.574032034304452,
+                "f1": 0.6753969431666419
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5095676779747009,
+                "tp": 1260,
+                "fp": 219,
+                "fn": 1342,
+                "precision": 0.8519269776876268,
+                "recall": 0.48424289008455035,
+                "f1": 0.6174957118353345
+              },
+              "selected_test": {
+                "threshold": 0.5095676779747009,
+                "tp": 8947,
+                "fp": 1846,
+                "fn": 6911,
+                "precision": 0.8289632168998425,
+                "recall": 0.5641947282128894,
+                "f1": 0.6714194589321226
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.43480947613716125,
+              "tp": 1344,
+              "fp": 293,
+              "fn": 1258,
+              "precision": 0.8210140500916311,
+              "recall": 0.5165257494235204,
+              "f1": 0.6341118188251946
+            },
+            "selected_test": {
+              "threshold": 0.43480947613716125,
+              "tp": 9384,
+              "fp": 2332,
+              "fn": 6474,
+              "precision": 0.800955957664732,
+              "recall": 0.5917517972001514,
+              "f1": 0.6806411837237979
+            }
+          }
+        },
+        "density_adjust_alpha=0.02": {
+          "name": "density_adjust_alpha=0.02",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.4000212550163269,
+                "tp": 1377,
+                "fp": 339,
+                "fn": 1225,
+                "precision": 0.8024475524475524,
+                "recall": 0.5292083013066872,
+                "f1": 0.6377952755905512
+              },
+              "selected_test": {
+                "threshold": 0.4000212550163269,
+                "tp": 9535,
+                "fp": 2541,
+                "fn": 6323,
+                "precision": 0.7895826432593575,
+                "recall": 0.6012738050195485,
+                "f1": 0.6826806042815208
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.41963475942611694,
+                "tp": 1361,
+                "fp": 316,
+                "fn": 1241,
+                "precision": 0.8115682766845558,
+                "recall": 0.5230591852421215,
+                "f1": 0.6361299369011453
+              },
+              "selected_test": {
+                "threshold": 0.41963475942611694,
+                "tp": 9430,
+                "fp": 2380,
+                "fn": 6428,
+                "precision": 0.7984758679085521,
+                "recall": 0.5946525413040736,
+                "f1": 0.6816538961977736
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4396130442619324,
+                "tp": 1334,
+                "fp": 292,
+                "fn": 1268,
+                "precision": 0.8204182041820418,
+                "recall": 0.5126825518831668,
+                "f1": 0.631031220435194
+              },
+              "selected_test": {
+                "threshold": 0.4396130442619324,
+                "tp": 9326,
+                "fp": 2232,
+                "fn": 6532,
+                "precision": 0.8068870046720886,
+                "recall": 0.588094337243032,
+                "f1": 0.6803326524657134
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.45383840799331665,
+                "tp": 1324,
+                "fp": 271,
+                "fn": 1278,
+                "precision": 0.8300940438871474,
+                "recall": 0.5088393543428132,
+                "f1": 0.6309268525137003
+              },
+              "selected_test": {
+                "threshold": 0.45383840799331665,
+                "tp": 9237,
+                "fp": 2135,
+                "fn": 6621,
+                "precision": 0.812258177981006,
+                "recall": 0.5824820279984866,
+                "f1": 0.6784428938670584
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4875161349773407,
+                "tp": 1281,
+                "fp": 242,
+                "fn": 1321,
+                "precision": 0.8411030860144452,
+                "recall": 0.4923136049192928,
+                "f1": 0.621090909090909
+              },
+              "selected_test": {
+                "threshold": 0.4875161349773407,
+                "tp": 9034,
+                "fp": 1921,
+                "fn": 6824,
+                "precision": 0.8246462802373346,
+                "recall": 0.5696809181485686,
+                "f1": 0.6738522358557416
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5255945920944214,
+                "tp": 1239,
+                "fp": 214,
+                "fn": 1363,
+                "precision": 0.8527185134205093,
+                "recall": 0.4761721752498078,
+                "f1": 0.6110974106041924
+              },
+              "selected_test": {
+                "threshold": 0.5255945920944214,
+                "tp": 8794,
+                "fp": 1683,
+                "fn": 7064,
+                "precision": 0.8393624129044573,
+                "recall": 0.5545466010846261,
+                "f1": 0.66785646478071
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.4396130442619324,
+              "tp": 1334,
+              "fp": 292,
+              "fn": 1268,
+              "precision": 0.8204182041820418,
+              "recall": 0.5126825518831668,
+              "f1": 0.631031220435194
+            },
+            "selected_test": {
+              "threshold": 0.4396130442619324,
+              "tp": 9326,
+              "fp": 2232,
+              "fn": 6532,
+              "precision": 0.8068870046720886,
+              "recall": 0.588094337243032,
+              "f1": 0.6803326524657134
+            }
+          }
+        },
+        "density_adjust_alpha=0.04": {
+          "name": "density_adjust_alpha=0.04",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.401584267616272,
+                "tp": 1376,
+                "fp": 341,
+                "fn": 1226,
+                "precision": 0.8013977868375073,
+                "recall": 0.5288239815526518,
+                "f1": 0.6371845334568188
+              },
+              "selected_test": {
+                "threshold": 0.401584267616272,
+                "tp": 9490,
+                "fp": 2467,
+                "fn": 6368,
+                "precision": 0.7936773438153383,
+                "recall": 0.5984361205700592,
+                "f1": 0.6823656300557254
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4274050295352936,
+                "tp": 1348,
+                "fp": 312,
+                "fn": 1254,
+                "precision": 0.8120481927710843,
+                "recall": 0.5180630284396618,
+                "f1": 0.6325668700140779
+              },
+              "selected_test": {
+                "threshold": 0.4274050295352936,
+                "tp": 9345,
+                "fp": 2270,
+                "fn": 6513,
+                "precision": 0.8045630650021524,
+                "recall": 0.5892924706772606,
+                "f1": 0.6803042987660611
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4405171871185303,
+                "tp": 1337,
+                "fp": 293,
+                "fn": 1265,
+                "precision": 0.8202453987730062,
+                "recall": 0.5138355111452728,
+                "f1": 0.6318525519848771
+              },
+              "selected_test": {
+                "threshold": 0.4405171871185303,
+                "tp": 9282,
+                "fp": 2182,
+                "fn": 6576,
+                "precision": 0.8096650383810189,
+                "recall": 0.5853197124479758,
+                "f1": 0.6794524558963473
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4599836468696594,
+                "tp": 1318,
+                "fp": 268,
+                "fn": 1284,
+                "precision": 0.8310214375788146,
+                "recall": 0.5065334358186011,
+                "f1": 0.6294173829990449
+              },
+              "selected_test": {
+                "threshold": 0.4599836468696594,
+                "tp": 9163,
+                "fp": 2051,
+                "fn": 6695,
+                "precision": 0.817103620474407,
+                "recall": 0.5778156135704376,
+                "f1": 0.6769355791962175
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.49700528383255005,
+                "tp": 1269,
+                "fp": 237,
+                "fn": 1333,
+                "precision": 0.8426294820717132,
+                "recall": 0.48770176787086855,
+                "f1": 0.6178188899707887
+              },
+              "selected_test": {
+                "threshold": 0.49700528383255005,
+                "tp": 8942,
+                "fp": 1804,
+                "fn": 6916,
+                "precision": 0.8321235808672994,
+                "recall": 0.5638794299407239,
+                "f1": 0.6722297398887386
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5239735841751099,
+                "tp": 1240,
+                "fp": 215,
+                "fn": 1362,
+                "precision": 0.852233676975945,
+                "recall": 0.4765564950038432,
+                "f1": 0.6112891298989401
+              },
+              "selected_test": {
+                "threshold": 0.5239735841751099,
+                "tp": 8752,
+                "fp": 1640,
+                "fn": 7106,
+                "precision": 0.8421862971516552,
+                "recall": 0.5518980955984362,
+                "f1": 0.6668190476190475
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.4274050295352936,
+              "tp": 1348,
+              "fp": 312,
+              "fn": 1254,
+              "precision": 0.8120481927710843,
+              "recall": 0.5180630284396618,
+              "f1": 0.6325668700140779
+            },
+            "selected_test": {
+              "threshold": 0.4274050295352936,
+              "tp": 9345,
+              "fp": 2270,
+              "fn": 6513,
+              "precision": 0.8045630650021524,
+              "recall": 0.5892924706772606,
+              "f1": 0.6803042987660611
+            }
+          }
+        },
+        "density_adjust_alpha=0.06": {
+          "name": "density_adjust_alpha=0.06",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.4069804847240448,
+                "tp": 1372,
+                "fp": 339,
+                "fn": 1230,
+                "precision": 0.8018702513150204,
+                "recall": 0.5272867025365103,
+                "f1": 0.6362160908880129
+              },
+              "selected_test": {
+                "threshold": 0.4069804847240448,
+                "tp": 9434,
+                "fp": 2372,
+                "fn": 6424,
+                "precision": 0.799085210909707,
+                "recall": 0.594904779921806,
+                "f1": 0.6820416425679584
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.42432770133018494,
+                "tp": 1355,
+                "fp": 314,
+                "fn": 1247,
+                "precision": 0.8118633912522468,
+                "recall": 0.5207532667179093,
+                "f1": 0.6345118239288223
+              },
+              "selected_test": {
+                "threshold": 0.42432770133018494,
+                "tp": 9334,
+                "fp": 2253,
+                "fn": 6524,
+                "precision": 0.8055579528782256,
+                "recall": 0.5885988144784967,
+                "f1": 0.6801967571506651
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4490562975406647,
+                "tp": 1322,
+                "fp": 287,
+                "fn": 1280,
+                "precision": 0.8216283405842137,
+                "recall": 0.5080707148347425,
+                "f1": 0.6278793635715981
+              },
+              "selected_test": {
+                "threshold": 0.4490562975406647,
+                "tp": 9185,
+                "fp": 2092,
+                "fn": 6673,
+                "precision": 0.8144896692382726,
+                "recall": 0.5792029259679657,
+                "f1": 0.6769854431545974
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4651017487049103,
+                "tp": 1308,
+                "fp": 266,
+                "fn": 1294,
+                "precision": 0.8310038119440915,
+                "recall": 0.5026902382782475,
+                "f1": 0.6264367816091954
+              },
+              "selected_test": {
+                "threshold": 0.4651017487049103,
+                "tp": 9087,
+                "fp": 1976,
+                "fn": 6771,
+                "precision": 0.8213866039952996,
+                "recall": 0.5730230798335225,
+                "f1": 0.6750863638052079
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5020807385444641,
+                "tp": 1270,
+                "fp": 236,
+                "fn": 1332,
+                "precision": 0.8432934926958832,
+                "recall": 0.4880860876249039,
+                "f1": 0.6183057448880234
+              },
+              "selected_test": {
+                "threshold": 0.5020807385444641,
+                "tp": 8842,
+                "fp": 1737,
+                "fn": 7016,
+                "precision": 0.8358067870309103,
+                "recall": 0.5575734644974145,
+                "f1": 0.668910995952642
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5189775228500366,
+                "tp": 1243,
+                "fp": 218,
+                "fn": 1359,
+                "precision": 0.8507871321013005,
+                "recall": 0.4777094542659493,
+                "f1": 0.6118631553039626
+              },
+              "selected_test": {
+                "threshold": 0.5189775228500366,
+                "tp": 8721,
+                "fp": 1638,
+                "fn": 7137,
+                "precision": 0.841876629018245,
+                "recall": 0.5499432463110102,
+                "f1": 0.6652935118434604
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.42432770133018494,
+              "tp": 1355,
+              "fp": 314,
+              "fn": 1247,
+              "precision": 0.8118633912522468,
+              "recall": 0.5207532667179093,
+              "f1": 0.6345118239288223
+            },
+            "selected_test": {
+              "threshold": 0.42432770133018494,
+              "tp": 9334,
+              "fp": 2253,
+              "fn": 6524,
+              "precision": 0.8055579528782256,
+              "recall": 0.5885988144784967,
+              "f1": 0.6801967571506651
+            }
+          }
+        },
+        "density_adjust_alpha=0.08": {
+          "name": "density_adjust_alpha=0.08",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.4072762727737427,
+                "tp": 1369,
+                "fp": 342,
+                "fn": 1233,
+                "precision": 0.8001168907071888,
+                "recall": 0.5261337432744043,
+                "f1": 0.6348249478321354
+              },
+              "selected_test": {
+                "threshold": 0.4072762727737427,
+                "tp": 9391,
+                "fp": 2329,
+                "fn": 6467,
+                "precision": 0.8012798634812287,
+                "recall": 0.592193214781183,
+                "f1": 0.6810501124084415
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4404716491699219,
+                "tp": 1335,
+                "fp": 311,
+                "fn": 1267,
+                "precision": 0.8110571081409478,
+                "recall": 0.5130668716372021,
+                "f1": 0.6285310734463276
+              },
+              "selected_test": {
+                "threshold": 0.4404716491699219,
+                "tp": 9176,
+                "fp": 2106,
+                "fn": 6682,
+                "precision": 0.8133309696862259,
+                "recall": 0.5786353890780679,
+                "f1": 0.6761974944731024
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4580737352371216,
+                "tp": 1320,
+                "fp": 289,
+                "fn": 1282,
+                "precision": 0.8203853325046613,
+                "recall": 0.5073020753266718,
+                "f1": 0.6269294704345761
+              },
+              "selected_test": {
+                "threshold": 0.4580737352371216,
+                "tp": 9066,
+                "fp": 1994,
+                "fn": 6792,
+                "precision": 0.8197106690777577,
+                "recall": 0.5716988270904275,
+                "f1": 0.6736013076751617
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4791569113731384,
+                "tp": 1296,
+                "fp": 261,
+                "fn": 1306,
+                "precision": 0.8323699421965318,
+                "recall": 0.4980784012298232,
+                "f1": 0.6232267371964415
+              },
+              "selected_test": {
+                "threshold": 0.4791569113731384,
+                "tp": 8938,
+                "fp": 1852,
+                "fn": 6920,
+                "precision": 0.8283595922150139,
+                "recall": 0.5636271913229915,
+                "f1": 0.6708195737015912
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5082720518112183,
+                "tp": 1255,
+                "fp": 235,
+                "fn": 1347,
+                "precision": 0.8422818791946308,
+                "recall": 0.48232129131437357,
+                "f1": 0.6133919843597262
+              },
+              "selected_test": {
+                "threshold": 0.5082720518112183,
+                "tp": 8754,
+                "fp": 1661,
+                "fn": 7104,
+                "precision": 0.8405184829572732,
+                "recall": 0.5520242149073024,
+                "f1": 0.66638754615004
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5308721661567688,
+                "tp": 1232,
+                "fp": 215,
+                "fn": 1370,
+                "precision": 0.8514167242570836,
+                "recall": 0.4734819369715603,
+                "f1": 0.6085453198320573
+              },
+              "selected_test": {
+                "threshold": 0.5308721661567688,
+                "tp": 8607,
+                "fp": 1545,
+                "fn": 7251,
+                "precision": 0.8478132387706856,
+                "recall": 0.5427544457056376,
+                "f1": 0.6618223760092273
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8,
+            "selected_calibration": {
+              "threshold": 0.4072762727737427,
+              "tp": 1369,
+              "fp": 342,
+              "fn": 1233,
+              "precision": 0.8001168907071888,
+              "recall": 0.5261337432744043,
+              "f1": 0.6348249478321354
+            },
+            "selected_test": {
+              "threshold": 0.4072762727737427,
+              "tp": 9391,
+              "fp": 2329,
+              "fn": 6467,
+              "precision": 0.8012798634812287,
+              "recall": 0.592193214781183,
+              "f1": 0.6810501124084415
+            }
+          }
+        },
+        "density_adjust_alpha=0.10": {
+          "name": "density_adjust_alpha=0.10",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.43108710646629333,
+                "tp": 1343,
+                "fp": 334,
+                "fn": 1259,
+                "precision": 0.800834824090638,
+                "recall": 0.5161414296694851,
+                "f1": 0.6277167562514606
+              },
+              "selected_test": {
+                "threshold": 0.43108710646629333,
+                "tp": 9181,
+                "fp": 2151,
+                "fn": 6677,
+                "precision": 0.8101835510060007,
+                "recall": 0.5789506873502334,
+                "f1": 0.6753218094887826
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4569036066532135,
+                "tp": 1324,
+                "fp": 302,
+                "fn": 1278,
+                "precision": 0.8142681426814268,
+                "recall": 0.5088393543428132,
+                "f1": 0.6263008514664145
+              },
+              "selected_test": {
+                "threshold": 0.4569036066532135,
+                "tp": 9029,
+                "fp": 1971,
+                "fn": 6829,
+                "precision": 0.8208181818181818,
+                "recall": 0.5693656198764031,
+                "f1": 0.6723508824186463
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.47067990899086,
+                "tp": 1311,
+                "fp": 281,
+                "fn": 1291,
+                "precision": 0.8234924623115578,
+                "recall": 0.5038431975403536,
+                "f1": 0.625178826895565
+              },
+              "selected_test": {
+                "threshold": 0.47067990899086,
+                "tp": 8942,
+                "fp": 1887,
+                "fn": 6916,
+                "precision": 0.82574568288854,
+                "recall": 0.5638794299407239,
+                "f1": 0.6701390189980141
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4910038709640503,
+                "tp": 1280,
+                "fp": 260,
+                "fn": 1322,
+                "precision": 0.8311688311688312,
+                "recall": 0.49192928516525747,
+                "f1": 0.6180589087397392
+              },
+              "selected_test": {
+                "threshold": 0.4910038709640503,
+                "tp": 8812,
+                "fp": 1734,
+                "fn": 7046,
+                "precision": 0.8355774701308553,
+                "recall": 0.5556816748644218,
+                "f1": 0.6674746250568097
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.5080832242965698,
+                "tp": 1261,
+                "fp": 240,
+                "fn": 1341,
+                "precision": 0.8401065956029313,
+                "recall": 0.4846272098385857,
+                "f1": 0.6146721910796978
+              },
+              "selected_test": {
+                "threshold": 0.5080832242965698,
+                "tp": 8712,
+                "fp": 1648,
+                "fn": 7146,
+                "precision": 0.8409266409266409,
+                "recall": 0.5493757094211124,
+                "f1": 0.6645815851704936
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.532250165939331,
+                "tp": 1227,
+                "fp": 216,
+                "fn": 1375,
+                "precision": 0.8503118503118503,
+                "recall": 0.47156033820138354,
+                "f1": 0.6066749072929543
+              },
+              "selected_test": {
+                "threshold": 0.532250165939331,
+                "tp": 8554,
+                "fp": 1512,
+                "fn": 7304,
+                "precision": 0.8497913769123783,
+                "recall": 0.5394122840206835,
+                "f1": 0.6599290232988736
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8,
+            "selected_calibration": {
+              "threshold": 0.43108710646629333,
+              "tp": 1343,
+              "fp": 334,
+              "fn": 1259,
+              "precision": 0.800834824090638,
+              "recall": 0.5161414296694851,
+              "f1": 0.6277167562514606
+            },
+            "selected_test": {
+              "threshold": 0.43108710646629333,
+              "tp": 9181,
+              "fp": 2151,
+              "fn": 6677,
+              "precision": 0.8101835510060007,
+              "recall": 0.5789506873502334,
+              "f1": 0.6753218094887826
+            }
+          }
+        },
+        "rank_blend_beta=0.10": {
+          "name": "rank_blend_beta=0.10",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.40220385789871216,
+                "tp": 1384,
+                "fp": 345,
+                "fn": 1218,
+                "precision": 0.8004626951995373,
+                "recall": 0.5318985395849347,
+                "f1": 0.6391133687370123
+              },
+              "selected_test": {
+                "threshold": 0.40220385789871216,
+                "tp": 9577,
+                "fp": 2624,
+                "fn": 6281,
+                "precision": 0.7849356610113926,
+                "recall": 0.6039223105057384,
+                "f1": 0.6826330232723903
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4258382022380829,
+                "tp": 1362,
+                "fp": 315,
+                "fn": 1240,
+                "precision": 0.8121645796064401,
+                "recall": 0.5234435049961568,
+                "f1": 0.6365973358261277
+              },
+              "selected_test": {
+                "threshold": 0.4258382022380829,
+                "tp": 9441,
+                "fp": 2421,
+                "fn": 6417,
+                "precision": 0.7959028831562974,
+                "recall": 0.5953461975028377,
+                "f1": 0.6811688311688312
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.443829745054245,
+                "tp": 1340,
+                "fp": 286,
+                "fn": 1262,
+                "precision": 0.8241082410824109,
+                "recall": 0.5149884704073789,
+                "f1": 0.6338694418164617
+              },
+              "selected_test": {
+                "threshold": 0.443829745054245,
+                "tp": 9331,
+                "fp": 2269,
+                "fn": 6527,
+                "precision": 0.8043965517241379,
+                "recall": 0.5884096355151974,
+                "f1": 0.6796562021997232
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47576645016670227,
+                "tp": 1300,
+                "fp": 260,
+                "fn": 1302,
+                "precision": 0.8333333333333334,
+                "recall": 0.49961568024596464,
+                "f1": 0.624699663623258
+              },
+              "selected_test": {
+                "threshold": 0.47576645016670227,
+                "tp": 9135,
+                "fp": 2041,
+                "fn": 6723,
+                "precision": 0.8173765211166786,
+                "recall": 0.576049943246311,
+                "f1": 0.6758156395649921
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4904472231864929,
+                "tp": 1282,
+                "fp": 241,
+                "fn": 1320,
+                "precision": 0.8417596848325674,
+                "recall": 0.49269792467332824,
+                "f1": 0.6215757575757576
+              },
+              "selected_test": {
+                "threshold": 0.4904472231864929,
+                "tp": 9044,
+                "fp": 1946,
+                "fn": 6814,
+                "precision": 0.8229299363057325,
+                "recall": 0.5703115146928995,
+                "f1": 0.6737187127532778
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5090310573577881,
+                "tp": 1262,
+                "fp": 219,
+                "fn": 1340,
+                "precision": 0.8521269412559082,
+                "recall": 0.48501152959262106,
+                "f1": 0.6181729120744551
+              },
+              "selected_test": {
+                "threshold": 0.5090310573577881,
+                "tp": 8917,
+                "fp": 1828,
+                "fn": 6941,
+                "precision": 0.8298743601675198,
+                "recall": 0.5623029385798965,
+                "f1": 0.6703755215577191
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.443829745054245,
+              "tp": 1340,
+              "fp": 286,
+              "fn": 1262,
+              "precision": 0.8241082410824109,
+              "recall": 0.5149884704073789,
+              "f1": 0.6338694418164617
+            },
+            "selected_test": {
+              "threshold": 0.443829745054245,
+              "tp": 9331,
+              "fp": 2269,
+              "fn": 6527,
+              "precision": 0.8043965517241379,
+              "recall": 0.5884096355151974,
+              "f1": 0.6796562021997232
+            }
+          }
+        },
+        "rank_blend_beta=0.20": {
+          "name": "rank_blend_beta=0.20",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.41691017150878906,
+                "tp": 1375,
+                "fp": 334,
+                "fn": 1227,
+                "precision": 0.8045640725570509,
+                "recall": 0.5284396617986165,
+                "f1": 0.6379030387381118
+              },
+              "selected_test": {
+                "threshold": 0.41691017150878906,
+                "tp": 9497,
+                "fp": 2517,
+                "fn": 6361,
+                "precision": 0.7904944231729649,
+                "recall": 0.5988775381510909,
+                "f1": 0.6814724454649828
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4281279146671295,
+                "tp": 1360,
+                "fp": 317,
+                "fn": 1242,
+                "precision": 0.8109719737626714,
+                "recall": 0.5226748654880861,
+                "f1": 0.6356625379761626
+              },
+              "selected_test": {
+                "threshold": 0.4281279146671295,
+                "tp": 9425,
+                "fp": 2402,
+                "fn": 6433,
+                "precision": 0.7969053859812294,
+                "recall": 0.5943372430319082,
+                "f1": 0.6808741195593281
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.448091596364975,
+                "tp": 1338,
+                "fp": 288,
+                "fn": 1264,
+                "precision": 0.8228782287822878,
+                "recall": 0.5142198308993082,
+                "f1": 0.6329233680227058
+              },
+              "selected_test": {
+                "threshold": 0.448091596364975,
+                "tp": 9304,
+                "fp": 2245,
+                "fn": 6554,
+                "precision": 0.8056108754004676,
+                "recall": 0.5867070248455039,
+                "f1": 0.6789506330499507
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.47519105672836304,
+                "tp": 1303,
+                "fp": 262,
+                "fn": 1299,
+                "precision": 0.8325878594249201,
+                "recall": 0.5007686395080707,
+                "f1": 0.6253899688024959
+              },
+              "selected_test": {
+                "threshold": 0.47519105672836304,
+                "tp": 9125,
+                "fp": 2050,
+                "fn": 6733,
+                "precision": 0.8165548098434005,
+                "recall": 0.57541934670198,
+                "f1": 0.6751008027225983
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.49184274673461914,
+                "tp": 1287,
+                "fp": 243,
+                "fn": 1315,
+                "precision": 0.8411764705882353,
+                "recall": 0.494619523443505,
+                "f1": 0.6229428848015489
+              },
+              "selected_test": {
+                "threshold": 0.49184274673461914,
+                "tp": 9009,
+                "fp": 1935,
+                "fn": 6849,
+                "precision": 0.8231907894736842,
+                "recall": 0.5681044267877412,
+                "f1": 0.6722632639355272
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5160448551177979,
+                "tp": 1253,
+                "fp": 219,
+                "fn": 1349,
+                "precision": 0.8512228260869565,
+                "recall": 0.48155265180630286,
+                "f1": 0.6151202749140893
+              },
+              "selected_test": {
+                "threshold": 0.5160448551177979,
+                "tp": 8836,
+                "fp": 1769,
+                "fn": 7022,
+                "precision": 0.8331918906176332,
+                "recall": 0.557195106570816,
+                "f1": 0.6678003249820504
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.448091596364975,
+              "tp": 1338,
+              "fp": 288,
+              "fn": 1264,
+              "precision": 0.8228782287822878,
+              "recall": 0.5142198308993082,
+              "f1": 0.6329233680227058
+            },
+            "selected_test": {
+              "threshold": 0.448091596364975,
+              "tp": 9304,
+              "fp": 2245,
+              "fn": 6554,
+              "precision": 0.8056108754004676,
+              "recall": 0.5867070248455039,
+              "f1": 0.6789506330499507
+            }
+          }
+        },
+        "rank_blend_beta=0.30": {
+          "name": "rank_blend_beta=0.30",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.42084652185440063,
+                "tp": 1374,
+                "fp": 337,
+                "fn": 1228,
+                "precision": 0.8030391583869082,
+                "recall": 0.528055342044581,
+                "f1": 0.6371435195919313
+              },
+              "selected_test": {
+                "threshold": 0.42084652185440063,
+                "tp": 9478,
+                "fp": 2493,
+                "fn": 6380,
+                "precision": 0.7917467212430039,
+                "recall": 0.5976794047168622,
+                "f1": 0.6811599410686694
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.43966051936149597,
+                "tp": 1348,
+                "fp": 312,
+                "fn": 1254,
+                "precision": 0.8120481927710843,
+                "recall": 0.5180630284396618,
+                "f1": 0.6325668700140779
+              },
+              "selected_test": {
+                "threshold": 0.43966051936149597,
+                "tp": 9359,
+                "fp": 2326,
+                "fn": 6499,
+                "precision": 0.800941377834831,
+                "recall": 0.590175305839324,
+                "f1": 0.6795919108303381
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.45163705945014954,
+                "tp": 1336,
+                "fp": 290,
+                "fn": 1266,
+                "precision": 0.8216482164821648,
+                "recall": 0.5134511913912375,
+                "f1": 0.6319772942289499
+              },
+              "selected_test": {
+                "threshold": 0.45163705945014954,
+                "tp": 9269,
+                "fp": 2218,
+                "fn": 6589,
+                "precision": 0.8069121615739532,
+                "recall": 0.5844999369403455,
+                "f1": 0.6779301517644907
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4662801921367645,
+                "tp": 1319,
+                "fp": 270,
+                "fn": 1283,
+                "precision": 0.830081812460667,
+                "recall": 0.5069177555726364,
+                "f1": 0.6294440467668813
+              },
+              "selected_test": {
+                "threshold": 0.4662801921367645,
+                "tp": 9170,
+                "fp": 2115,
+                "fn": 6688,
+                "precision": 0.8125830748781568,
+                "recall": 0.5782570311514693,
+                "f1": 0.6756806543123457
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4912867844104767,
+                "tp": 1290,
+                "fp": 245,
+                "fn": 1312,
+                "precision": 0.8403908794788274,
+                "recall": 0.4957724827056111,
+                "f1": 0.6236403190717912
+              },
+              "selected_test": {
+                "threshold": 0.4912867844104767,
+                "tp": 8991,
+                "fp": 1931,
+                "fn": 6867,
+                "precision": 0.8232008789598975,
+                "recall": 0.5669693530079455,
+                "f1": 0.6714712471994024
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5162934064865112,
+                "tp": 1251,
+                "fp": 219,
+                "fn": 1351,
+                "precision": 0.8510204081632653,
+                "recall": 0.48078401229823214,
+                "f1": 0.6144400785854617
+              },
+              "selected_test": {
+                "threshold": 0.5162934064865112,
+                "tp": 8810,
+                "fp": 1751,
+                "fn": 7048,
+                "precision": 0.8342013066944418,
+                "recall": 0.5555555555555556,
+                "f1": 0.6669442446723949
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.43966051936149597,
+              "tp": 1348,
+              "fp": 312,
+              "fn": 1254,
+              "precision": 0.8120481927710843,
+              "recall": 0.5180630284396618,
+              "f1": 0.6325668700140779
+            },
+            "selected_test": {
+              "threshold": 0.43966051936149597,
+              "tp": 9359,
+              "fp": 2326,
+              "fn": 6499,
+              "precision": 0.800941377834831,
+              "recall": 0.590175305839324,
+              "f1": 0.6795919108303381
+            }
+          }
+        },
+        "rank_blend_beta=0.40": {
+          "name": "rank_blend_beta=0.40",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.423919677734375,
+                "tp": 1371,
+                "fp": 340,
+                "fn": 1231,
+                "precision": 0.8012857977790766,
+                "recall": 0.526902382782475,
+                "f1": 0.6357523765360538
+              },
+              "selected_test": {
+                "threshold": 0.423919677734375,
+                "tp": 9461,
+                "fp": 2480,
+                "fn": 6397,
+                "precision": 0.7923122016581526,
+                "recall": 0.5966073905914996,
+                "f1": 0.6806719666175043
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.44410738348960876,
+                "tp": 1346,
+                "fp": 314,
+                "fn": 1256,
+                "precision": 0.810843373493976,
+                "recall": 0.5172943889315911,
+                "f1": 0.6316283435007038
+              },
+              "selected_test": {
+                "threshold": 0.44410738348960876,
+                "tp": 9309,
+                "fp": 2293,
+                "fn": 6549,
+                "precision": 0.8023616617824513,
+                "recall": 0.5870223231176693,
+                "f1": 0.6780043699927167
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4573499262332916,
+                "tp": 1336,
+                "fp": 291,
+                "fn": 1266,
+                "precision": 0.8211432083589428,
+                "recall": 0.5134511913912375,
+                "f1": 0.6318278552849373
+              },
+              "selected_test": {
+                "threshold": 0.4573499262332916,
+                "tp": 9217,
+                "fp": 2190,
+                "fn": 6641,
+                "precision": 0.8080126238274744,
+                "recall": 0.5812208349098247,
+                "f1": 0.6761048963873096
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4740403890609741,
+                "tp": 1313,
+                "fp": 265,
+                "fn": 1289,
+                "precision": 0.8320659062103929,
+                "recall": 0.5046118370484243,
+                "f1": 0.6282296650717704
+              },
+              "selected_test": {
+                "threshold": 0.4740403890609741,
+                "tp": 9088,
+                "fp": 2059,
+                "fn": 6770,
+                "precision": 0.8152866242038217,
+                "recall": 0.5730861394879556,
+                "f1": 0.67306054434364
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4990760385990143,
+                "tp": 1282,
+                "fp": 241,
+                "fn": 1320,
+                "precision": 0.8417596848325674,
+                "recall": 0.49269792467332824,
+                "f1": 0.6215757575757576
+              },
+              "selected_test": {
+                "threshold": 0.4990760385990143,
+                "tp": 8901,
+                "fp": 1862,
+                "fn": 6957,
+                "precision": 0.8269999070891015,
+                "recall": 0.5612939841089671,
+                "f1": 0.6687201833139251
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5241117477416992,
+                "tp": 1243,
+                "fp": 216,
+                "fn": 1359,
+                "precision": 0.8519533927347498,
+                "recall": 0.4777094542659493,
+                "f1": 0.6121644915045557
+              },
+              "selected_test": {
+                "threshold": 0.5241117477416992,
+                "tp": 8699,
+                "fp": 1692,
+                "fn": 7159,
+                "precision": 0.8371667789433164,
+                "recall": 0.5485559339134821,
+                "f1": 0.662806202141034
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.81,
+            "selected_calibration": {
+              "threshold": 0.44410738348960876,
+              "tp": 1346,
+              "fp": 314,
+              "fn": 1256,
+              "precision": 0.810843373493976,
+              "recall": 0.5172943889315911,
+              "f1": 0.6316283435007038
+            },
+            "selected_test": {
+              "threshold": 0.44410738348960876,
+              "tp": 9309,
+              "fp": 2293,
+              "fn": 6549,
+              "precision": 0.8023616617824513,
+              "recall": 0.5870223231176693,
+              "f1": 0.6780043699927167
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.02": {
+          "name": "piece_z_blend_gamma=0.02",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3888251483440399,
+                "tp": 1385,
+                "fp": 344,
+                "fn": 1217,
+                "precision": 0.8010410641989589,
+                "recall": 0.53228285933897,
+                "f1": 0.6395751558531517
+              },
+              "selected_test": {
+                "threshold": 0.3888251483440399,
+                "tp": 9598,
+                "fp": 2650,
+                "fn": 6260,
+                "precision": 0.7836381450032658,
+                "recall": 0.6052465632488334,
+                "f1": 0.6829858393225646
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.41479411721229553,
+                "tp": 1362,
+                "fp": 315,
+                "fn": 1240,
+                "precision": 0.8121645796064401,
+                "recall": 0.5234435049961568,
+                "f1": 0.6365973358261277
+              },
+              "selected_test": {
+                "threshold": 0.41479411721229553,
+                "tp": 9459,
+                "fp": 2446,
+                "fn": 6399,
+                "precision": 0.794540109197816,
+                "recall": 0.5964812712826334,
+                "f1": 0.6814105103915283
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4321156144142151,
+                "tp": 1342,
+                "fp": 290,
+                "fn": 1260,
+                "precision": 0.8223039215686274,
+                "recall": 0.5157571099154497,
+                "f1": 0.6339159187529523
+              },
+              "selected_test": {
+                "threshold": 0.4321156144142151,
+                "tp": 9361,
+                "fp": 2301,
+                "fn": 6497,
+                "precision": 0.802692505573658,
+                "recall": 0.5903014251481902,
+                "f1": 0.6803052325581396
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4632093012332916,
+                "tp": 1309,
+                "fp": 265,
+                "fn": 1293,
+                "precision": 0.8316391359593392,
+                "recall": 0.5030745580322828,
+                "f1": 0.6269157088122606
+              },
+              "selected_test": {
+                "threshold": 0.4632093012332916,
+                "tp": 9186,
+                "fp": 2106,
+                "fn": 6672,
+                "precision": 0.8134962805526036,
+                "recall": 0.5792659856223988,
+                "f1": 0.6766850828729283
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4838499426841736,
+                "tp": 1283,
+                "fp": 240,
+                "fn": 1319,
+                "precision": 0.8424162836506894,
+                "recall": 0.4930822444273636,
+                "f1": 0.622060606060606
+              },
+              "selected_test": {
+                "threshold": 0.4838499426841736,
+                "tp": 9076,
+                "fp": 1977,
+                "fn": 6782,
+                "precision": 0.8211345336107844,
+                "recall": 0.5723294236347585,
+                "f1": 0.6745197131284604
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.5097171068191528,
+                "tp": 1257,
+                "fp": 219,
+                "fn": 1345,
+                "precision": 0.8516260162601627,
+                "recall": 0.4830899308224443,
+                "f1": 0.6164786660127514
+              },
+              "selected_test": {
+                "threshold": 0.5097171068191528,
+                "tp": 8929,
+                "fp": 1828,
+                "fn": 6929,
+                "precision": 0.8300641442781445,
+                "recall": 0.5630596544330937,
+                "f1": 0.670975014089799
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.4321156144142151,
+              "tp": 1342,
+              "fp": 290,
+              "fn": 1260,
+              "precision": 0.8223039215686274,
+              "recall": 0.5157571099154497,
+              "f1": 0.6339159187529523
+            },
+            "selected_test": {
+              "threshold": 0.4321156144142151,
+              "tp": 9361,
+              "fp": 2301,
+              "fn": 6497,
+              "precision": 0.802692505573658,
+              "recall": 0.5903014251481902,
+              "f1": 0.6803052325581396
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.04": {
+          "name": "piece_z_blend_gamma=0.04",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.38337498903274536,
+                "tp": 1384,
+                "fp": 345,
+                "fn": 1218,
+                "precision": 0.8004626951995373,
+                "recall": 0.5318985395849347,
+                "f1": 0.6391133687370123
+              },
+              "selected_test": {
+                "threshold": 0.38337498903274536,
+                "tp": 9586,
+                "fp": 2630,
+                "fn": 6272,
+                "precision": 0.7847085789129011,
+                "recall": 0.6044898473956363,
+                "f1": 0.6829094535869489
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.4027073085308075,
+                "tp": 1369,
+                "fp": 321,
+                "fn": 1233,
+                "precision": 0.8100591715976332,
+                "recall": 0.5261337432744043,
+                "f1": 0.6379310344827587
+              },
+              "selected_test": {
+                "threshold": 0.4027073085308075,
+                "tp": 9487,
+                "fp": 2485,
+                "fn": 6371,
+                "precision": 0.7924323421316405,
+                "recall": 0.59824694160676,
+                "f1": 0.6817822493711821
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.42952853441238403,
+                "tp": 1341,
+                "fp": 287,
+                "fn": 1261,
+                "precision": 0.8237100737100738,
+                "recall": 0.5153727901614144,
+                "f1": 0.6340425531914895
+              },
+              "selected_test": {
+                "threshold": 0.42952853441238403,
+                "tp": 9344,
+                "fp": 2272,
+                "fn": 6514,
+                "precision": 0.8044077134986226,
+                "recall": 0.5892294110228276,
+                "f1": 0.6802067409186868
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.45634976029396057,
+                "tp": 1310,
+                "fp": 268,
+                "fn": 1292,
+                "precision": 0.8301647655259823,
+                "recall": 0.5034588777863183,
+                "f1": 0.6267942583732058
+              },
+              "selected_test": {
+                "threshold": 0.45634976029396057,
+                "tp": 9199,
+                "fp": 2110,
+                "fn": 6659,
+                "precision": 0.8134229374834203,
+                "recall": 0.580085761130029,
+                "f1": 0.6772186844333199
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4831710159778595,
+                "tp": 1284,
+                "fp": 242,
+                "fn": 1318,
+                "precision": 0.8414154652686763,
+                "recall": 0.49346656418139895,
+                "f1": 0.6220930232558141
+              },
+              "selected_test": {
+                "threshold": 0.4831710159778595,
+                "tp": 9061,
+                "fp": 1961,
+                "fn": 6797,
+                "precision": 0.8220831065142442,
+                "recall": 0.571383528818262,
+                "f1": 0.6741815476190476
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.509992241859436,
+                "tp": 1256,
+                "fp": 216,
+                "fn": 1346,
+                "precision": 0.8532608695652174,
+                "recall": 0.4827056110684089,
+                "f1": 0.616593028964163
+              },
+              "selected_test": {
+                "threshold": 0.509992241859436,
+                "tp": 8907,
+                "fp": 1814,
+                "fn": 6951,
+                "precision": 0.8307993657308087,
+                "recall": 0.5616723420355656,
+                "f1": 0.6702283757853944
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.42952853441238403,
+              "tp": 1341,
+              "fp": 287,
+              "fn": 1261,
+              "precision": 0.8237100737100738,
+              "recall": 0.5153727901614144,
+              "f1": 0.6340425531914895
+            },
+            "selected_test": {
+              "threshold": 0.42952853441238403,
+              "tp": 9344,
+              "fp": 2272,
+              "fn": 6514,
+              "precision": 0.8044077134986226,
+              "recall": 0.5892294110228276,
+              "f1": 0.6802067409186868
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.06": {
+          "name": "piece_z_blend_gamma=0.06",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.3806493580341339,
+                "tp": 1381,
+                "fp": 341,
+                "fn": 1221,
+                "precision": 0.8019744483159117,
+                "recall": 0.5307455803228286,
+                "f1": 0.6387604070305272
+              },
+              "selected_test": {
+                "threshold": 0.3806493580341339,
+                "tp": 9555,
+                "fp": 2594,
+                "fn": 6303,
+                "precision": 0.7864844843196971,
+                "recall": 0.6025349981082103,
+                "f1": 0.6823294176455885
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.3991662263870239,
+                "tp": 1366,
+                "fp": 319,
+                "fn": 1236,
+                "precision": 0.8106824925816024,
+                "recall": 0.5249807840122982,
+                "f1": 0.6372754840214603
+              },
+              "selected_test": {
+                "threshold": 0.3991662263870239,
+                "tp": 9461,
+                "fp": 2454,
+                "fn": 6397,
+                "precision": 0.7940411246328157,
+                "recall": 0.5966073905914996,
+                "f1": 0.681309185179851
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.4249759018421173,
+                "tp": 1340,
+                "fp": 286,
+                "fn": 1262,
+                "precision": 0.8241082410824109,
+                "recall": 0.5149884704073789,
+                "f1": 0.6338694418164617
+              },
+              "selected_test": {
+                "threshold": 0.4249759018421173,
+                "tp": 9341,
+                "fp": 2270,
+                "fn": 6517,
+                "precision": 0.8044957368013091,
+                "recall": 0.5890402320595283,
+                "f1": 0.6801121263970294
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.4639752507209778,
+                "tp": 1300,
+                "fp": 260,
+                "fn": 1302,
+                "precision": 0.8333333333333334,
+                "recall": 0.49961568024596464,
+                "f1": 0.624699663623258
+              },
+              "selected_test": {
+                "threshold": 0.4639752507209778,
+                "tp": 9139,
+                "fp": 2045,
+                "fn": 6719,
+                "precision": 0.8171494992846924,
+                "recall": 0.5763021818640434,
+                "f1": 0.6759115450040676
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.48270368576049805,
+                "tp": 1283,
+                "fp": 240,
+                "fn": 1319,
+                "precision": 0.8424162836506894,
+                "recall": 0.4930822444273636,
+                "f1": 0.622060606060606
+              },
+              "selected_test": {
+                "threshold": 0.48270368576049805,
+                "tp": 9041,
+                "fp": 1945,
+                "fn": 6817,
+                "precision": 0.8229564900782814,
+                "recall": 0.5701223357296002,
+                "f1": 0.6735955893309492
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.510267436504364,
+                "tp": 1256,
+                "fp": 216,
+                "fn": 1346,
+                "precision": 0.8532608695652174,
+                "recall": 0.4827056110684089,
+                "f1": 0.616593028964163
+              },
+              "selected_test": {
+                "threshold": 0.510267436504364,
+                "tp": 8890,
+                "fp": 1804,
+                "fn": 6968,
+                "precision": 0.831307275107537,
+                "recall": 0.5606003279102031,
+                "f1": 0.6696294064477254
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.4249759018421173,
+              "tp": 1340,
+              "fp": 286,
+              "fn": 1262,
+              "precision": 0.8241082410824109,
+              "recall": 0.5149884704073789,
+              "f1": 0.6338694418164617
+            },
+            "selected_test": {
+              "threshold": 0.4249759018421173,
+              "tp": 9341,
+              "fp": 2270,
+              "fn": 6517,
+              "precision": 0.8044957368013091,
+              "recall": 0.5890402320595283,
+              "f1": 0.6801121263970294
+            }
+          }
+        },
+        "piece_z_blend_gamma=0.08": {
+          "name": "piece_z_blend_gamma=0.08",
+          "margins": {
+            "margin=0.00": {
+              "requested_precision": 0.8,
+              "selected_calibration": {
+                "threshold": 0.37647223472595215,
+                "tp": 1381,
+                "fp": 339,
+                "fn": 1221,
+                "precision": 0.8029069767441861,
+                "recall": 0.5307455803228286,
+                "f1": 0.6390559925960204
+              },
+              "selected_test": {
+                "threshold": 0.37647223472595215,
+                "tp": 9543,
+                "fp": 2565,
+                "fn": 6315,
+                "precision": 0.7881565906838454,
+                "recall": 0.6017782822550133,
+                "f1": 0.6824715726239003
+              }
+            },
+            "margin=0.01": {
+              "requested_precision": 0.81,
+              "selected_calibration": {
+                "threshold": 0.39562514424324036,
+                "tp": 1365,
+                "fp": 319,
+                "fn": 1237,
+                "precision": 0.8105700712589073,
+                "recall": 0.5245964642582629,
+                "f1": 0.6369575361642558
+              },
+              "selected_test": {
+                "threshold": 0.39562514424324036,
+                "tp": 9449,
+                "fp": 2435,
+                "fn": 6409,
+                "precision": 0.7951026590373611,
+                "recall": 0.5958506747383024,
+                "f1": 0.6812053925455986
+              }
+            },
+            "margin=0.02": {
+              "requested_precision": 0.8200000000000001,
+              "selected_calibration": {
+                "threshold": 0.41477805376052856,
+                "tp": 1344,
+                "fp": 294,
+                "fn": 1258,
+                "precision": 0.8205128205128205,
+                "recall": 0.5165257494235204,
+                "f1": 0.6339622641509434
+              },
+              "selected_test": {
+                "threshold": 0.41477805376052856,
+                "tp": 9364,
+                "fp": 2295,
+                "fn": 6494,
+                "precision": 0.8031563598936444,
+                "recall": 0.5904906041114895,
+                "f1": 0.6805974488498019
+              }
+            },
+            "margin=0.03": {
+              "requested_precision": 0.8300000000000001,
+              "selected_calibration": {
+                "threshold": 0.453083872795105,
+                "tp": 1304,
+                "fp": 267,
+                "fn": 1298,
+                "precision": 0.83004455760662,
+                "recall": 0.5011529592621061,
+                "f1": 0.6249700455307933
+              },
+              "selected_test": {
+                "threshold": 0.453083872795105,
+                "tp": 9164,
+                "fp": 2076,
+                "fn": 6694,
+                "precision": 0.8153024911032029,
+                "recall": 0.5778786732248707,
+                "f1": 0.6763598789578567
+              }
+            },
+            "margin=0.04": {
+              "requested_precision": 0.8400000000000001,
+              "selected_calibration": {
+                "threshold": 0.4818132519721985,
+                "tp": 1283,
+                "fp": 241,
+                "fn": 1319,
+                "precision": 0.8418635170603674,
+                "recall": 0.4930822444273636,
+                "f1": 0.6219098400387786
+              },
+              "selected_test": {
+                "threshold": 0.4818132519721985,
+                "tp": 9027,
+                "fp": 1939,
+                "fn": 6831,
+                "precision": 0.8231807404705453,
+                "recall": 0.5692395005675369,
+                "f1": 0.6730539815090963
+              }
+            },
+            "margin=0.05": {
+              "requested_precision": 0.8500000000000001,
+              "selected_calibration": {
+                "threshold": 0.49983659386634827,
+                "tp": 1266,
+                "fp": 223,
+                "fn": 1336,
+                "precision": 0.8502350570852921,
+                "recall": 0.4865488086087625,
+                "f1": 0.6189195795648985
+              },
+              "selected_test": {
+                "threshold": 0.49983659386634827,
+                "tp": 8924,
+                "fp": 1847,
+                "fn": 6934,
+                "precision": 0.8285210286881441,
+                "recall": 0.5627443561609282,
+                "f1": 0.6702467234969395
+              }
+            }
+          },
+          "best_test": {
+            "requested_precision": 0.8200000000000001,
+            "selected_calibration": {
+              "threshold": 0.41477805376052856,
+              "tp": 1344,
+              "fp": 294,
+              "fn": 1258,
+              "precision": 0.8205128205128205,
+              "recall": 0.5165257494235204,
+              "f1": 0.6339622641509434
+            },
+            "selected_test": {
+              "threshold": 0.41477805376052856,
+              "tp": 9364,
+              "fp": 2295,
+              "fn": 6494,
+              "precision": 0.8031563598936444,
+              "recall": 0.5904906041114895,
+              "f1": 0.6805974488498019
+            }
+          }
+        }
+      },
+      "calibration_file_ids": [
+        14,
+        24,
+        30,
+        31,
+        35,
+        37,
+        39,
+        49,
+        53,
+        54,
+        57,
+        61,
+        62,
+        64,
+        66,
+        69,
+        76,
+        78,
+        80,
+        89,
+        95,
+        101,
+        105,
+        108,
+        112,
+        115,
+        116,
+        117,
+        120,
+        123,
+        126,
+        131,
+        134,
+        136
+      ]
+    }
+  }
+}
