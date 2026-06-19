@@ -6,7 +6,9 @@ import numpy as np
 import torch
 
 from run_verifier_improvement_suite import (
+    apply_category_score_adjustment,
     build_pair_indices,
+    category_risk_features,
     classify_candidate_patterns,
     convex_weight_grid,
     split_old_and_theory_features,
@@ -72,6 +74,36 @@ class VerifierImprovementSuiteTests(unittest.TestCase):
         self.assertEqual(rows["short_note"].tolist(), [False, True, False])
         self.assertEqual(rows["strong_beat"].tolist(), [False, False, True])
         self.assertEqual(rows["high_density"].tolist(), [False, False, True])
+
+    def test_category_risk_features_make_disjoint_groups_and_smooth_risk(self) -> None:
+        raw = torch.zeros(4, 36)
+        raw[:, 33] = torch.tensor([0.10, 0.10, 0.50, 0.50])
+        raw[:, 8] = torch.tensor([0.90, 0.10, 0.90, 0.10])
+
+        groups, risk = category_risk_features(raw)
+
+        self.assertEqual(groups.tolist(), [0, 1, 2, 3])
+        self.assertGreater(risk[0], risk[1])
+        self.assertGreater(risk[0], risk[2])
+        self.assertEqual(risk[3], 0.0)
+
+    def test_category_adjustment_adds_group_offsets_and_continuous_bonus(self) -> None:
+        scores = np.asarray([0.40, 0.40, 0.40, 0.40], dtype=np.float32)
+        groups = np.asarray([0, 1, 2, 3], dtype=np.int64)
+        risk = np.asarray([1.0, 0.5, 0.25, 0.0], dtype=np.float32)
+
+        adjusted = apply_category_score_adjustment(
+            scores,
+            groups,
+            risk,
+            offsets=(0.04, 0.03, 0.02),
+            risk_beta=0.05,
+        )
+
+        np.testing.assert_allclose(
+            adjusted,
+            np.asarray([0.49, 0.455, 0.4325, 0.40], dtype=np.float32),
+        )
 
 
 if __name__ == "__main__":

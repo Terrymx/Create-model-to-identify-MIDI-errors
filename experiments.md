@@ -1824,3 +1824,27 @@ low-cost verifier improvements:
 
 Success criterion remains maximum recall subject to precision `>= 0.80`, with
 the immediate target `R > 0.60`.
+
+## 2026-06-20 - Category-Aware Calibration
+
+The combined verifier improvement suite completed without beating the historical
+frontier:
+
+- convex fusion: `P=0.8071`, `R=0.5900`;
+- pairwise MLP ranker: `P=0.8026`, `R=0.5427`;
+- historical best remains `P=0.8008`, `R=0.5963`.
+
+Its error analysis found that false negatives are concentrated in scale tones
+(`64.7%`) and short notes (`72.6%`). The next experiment therefore keeps the
+candidate generators and four fitted HGB models frozen, then calibrates
+candidate scores by three disjoint categories:
+
+1. short and scale-tone;
+2. short only;
+3. scale-tone only.
+
+Each category receives a calibration-selected score offset. A continuous bonus
+based on duration shortness times scale confidence is searched jointly. The
+uncategorized group receives no offset, and all parameters and thresholds are
+selected only on calibration files. Test success remains `P >= 0.80` with the
+target `R > 0.60`.

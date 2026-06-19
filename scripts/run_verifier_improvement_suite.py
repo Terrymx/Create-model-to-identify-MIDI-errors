@@ -183,6 +183,34 @@ def classify_candidate_patterns(raw: torch.Tensor) -> dict[str, np.ndarray]:
     }
 
 
+def category_risk_features(raw: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
+    values = raw.numpy()
+    scale_confidence = np.maximum(values[:, 8], values[:, 9]).clip(0.0, 1.0)
+    short_strength = ((0.25 - values[:, 33]) / 0.25).clip(0.0, 1.0)
+    is_scale = scale_confidence >= 0.5
+    is_short = values[:, 33] <= 0.25
+    groups = np.full(len(values), 3, dtype=np.int64)
+    groups[is_short & is_scale] = 0
+    groups[is_short & ~is_scale] = 1
+    groups[~is_short & is_scale] = 2
+    risk = (short_strength * scale_confidence).astype(np.float32)
+    return groups, risk
+
+
+def apply_category_score_adjustment(
+    scores: np.ndarray,
+    groups: np.ndarray,
+    risk: np.ndarray,
+    offsets: tuple[float, float, float],
+    risk_beta: float,
+) -> np.ndarray:
+    adjusted = scores.astype(np.float32, copy=True)
+    for group, offset in enumerate(offsets):
+        adjusted[groups == group] += offset
+    adjusted += risk_beta * risk
+    return adjusted
+
+
 def make_dataset(args: argparse.Namespace, split: str, max_files: int | None) -> MaestroWrongNoteDataset:
     dataset = MaestroWrongNoteDataset(
         root=args.data_root,
@@ -429,6 +457,112 @@ def evaluate_fusion(
     }
 
 
+def evaluate_category_aware(
+    names: list[str],
+    scores: dict[str, np.ndarray],
+    blocks: dict[str, CandidateBlock],
+    fusion: dict,
+    target_precision: float,
+) -> dict:
+    calibration_density_z, test_density_z = density_z(
+        blocks["calibration"],
+        blocks["test"],
+    )
+    calibration_groups, calibration_risk = category_risk_features(
+        blocks["calibration"].raw
+    )
+    test_groups, test_risk = category_risk_features(blocks["test"].raw)
+    calibration_labels = blocks["calibration"].labels.numpy().astype(np.int64)
+    test_labels = blocks["test"].labels.numpy().astype(np.int64)
+    offset_grid = [0.00, 0.01, 0.02, 0.04, 0.06]
+    beta_grid = [0.00, 0.01, 0.02, 0.04, 0.06]
+    rows = []
+    for fusion_row in fusion["margins"]:
+        weights = np.asarray(
+            [fusion_row["weights"][name] for name in names],
+            dtype=np.float32,
+        )
+        alpha = fusion_row["density_alpha"]
+        calibration_base = (
+            scores["calibration"] @ weights - alpha * calibration_density_z
+        )
+        test_base = scores["test"] @ weights - alpha * test_density_z
+        best = None
+        for offsets in product(offset_grid, repeat=3):
+            for beta in beta_grid:
+                calibration_adjusted = apply_category_score_adjustment(
+                    calibration_base,
+                    calibration_groups,
+                    calibration_risk,
+                    offsets,
+                    beta,
+                )
+                selected = select_from_calibration(
+                    calibration_adjusted,
+                    calibration_labels,
+                    blocks["calibration"].stats["error_notes"],
+                    fusion_row["requested_precision"],
+                )
+                key = (
+                    selected["recall"],
+                    selected["precision"],
+                    -sum(offsets),
+                    -beta,
+                )
+                if best is None or key > best[0]:
+                    best = (key, offsets, beta, selected)
+        _, offsets, beta, selected = best
+        test_adjusted = apply_category_score_adjustment(
+            test_base,
+            test_groups,
+            test_risk,
+            offsets,
+            beta,
+        )
+        test_row = row_at_threshold(
+            test_adjusted,
+            test_labels,
+            blocks["test"].stats["error_notes"],
+            selected["threshold"],
+        )
+        rows.append(
+            {
+                "weights": fusion_row["weights"],
+                "density_alpha": alpha,
+                "requested_precision": fusion_row["requested_precision"],
+                "group_offsets": {
+                    "short_and_scale": offsets[0],
+                    "short_only": offsets[1],
+                    "scale_only": offsets[2],
+                },
+                "risk_beta": beta,
+                "selected_calibration": selected,
+                "selected_test": test_row,
+            }
+        )
+    return {
+        "margins": rows,
+        "best_feasible_test": max(
+            (
+                row
+                for row in rows
+                if row["selected_test"]["precision"] >= target_precision
+            ),
+            key=lambda row: (
+                row["selected_test"]["recall"],
+                row["selected_test"]["precision"],
+            ),
+            default=max(
+                rows,
+                key=lambda row: (
+                    row["selected_test"]["precision"],
+                    row["selected_test"]["recall"],
+                ),
+            ),
+        ),
+    }
+
+
 def train_pairwise_ranker(
     train_x: torch.Tensor,
     train_y: torch.Tensor,
@@ -583,6 +717,7 @@ def error_analysis(
 
 def write_markdown(path: Path, result: dict) -> None:
     fusion = result["fusion"]["best_feasible_test"]["selected_test"]
+    category = result["category_aware"]["best_feasible_test"]["selected_test"]
     ranker = result["pairwise_ranker"]["best_feasible_test"]["selected_test"]
     lines = [
         "# Verifier Improvement Suite",
@@ -592,6 +727,7 @@ def write_markdown(path: Path, result: dict) -> None:
         "| System | Precision | Recall | F1 |",
         "| --- | ---: | ---: | ---: |",
         f"| convex score fusion | {fusion['precision']:.4f} | {fusion['recall']:.4f} | {fusion['f1']:.4f} |",
+        f"| category-aware calibration | {category['precision']:.4f} | {category['recall']:.4f} | {category['f1']:.4f} |",
         f"| pairwise MLP ranker | {ranker['precision']:.4f} | {ranker['recall']:.4f} | {ranker['f1']:.4f} |",
         "",
         "## Error Pattern Analysis",
@@ -664,6 +800,13 @@ def main() -> None:
         blocks,
         args.target_precision,
     )
+    category_aware = evaluate_category_aware(
+        names,
+        base_scores,
+        blocks,
+        fusion,
+        args.target_precision,
+    )
 
     train_standardized, ranker_normalization, others = standardize(
         blocks["train"].full,
@@ -708,6 +851,7 @@ def main() -> None:
 
     candidates = [
         ("fusion", fusion["best_feasible_test"]),
+        ("category_aware", category_aware["best_feasible_test"]),
         ("pairwise_ranker", ranker["best_feasible_test"]),
     ]
     best_name, best_row = max(
@@ -719,7 +863,7 @@ def main() -> None:
             item[1]["selected_test"]["precision"],
         ),
     )
-    if best_name == "fusion":
+    if best_name in {"fusion", "category_aware"}:
         weights = np.asarray(
             [best_row["weights"][name] for name in names],
             dtype=np.float32,
@@ -730,6 +874,20 @@ def main() -> None:
             blocks["test"],
         )
         test_scores = test_scores - best_row["density_alpha"] * test_density_z
+        if best_name == "category_aware":
+            test_groups, test_risk = category_risk_features(blocks["test"].raw)
+            offsets = best_row["group_offsets"]
+            test_scores = apply_category_score_adjustment(
+                test_scores,
+                test_groups,
+                test_risk,
+                (
+                    offsets["short_and_scale"],
+                    offsets["short_only"],
+                    offsets["scale_only"],
+                ),
+                best_row["risk_beta"],
+            )
     else:
         test_scores = test_ranker_scores
     threshold = best_row["selected_calibration"]["threshold"]
@@ -747,6 +905,7 @@ def main() -> None:
         "calibration_files": calibration_files,
         "test_stats": blocks["test"].stats,
         "fusion": fusion,
+        "category_aware": category_aware,
         "pairwise_ranker": ranker,
         "analysis_system": best_name,
         "error_analysis": analysis,
