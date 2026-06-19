@@ -211,6 +211,21 @@ def apply_category_score_adjustment(
     return adjusted
 
 
+def observed_register_features(
+    raw: torch.Tensor,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    observed_pitch = np.rint(raw[:, 0].numpy() * 127.0).clip(0, 127)
+    registers = np.ones(len(observed_pitch), dtype=np.int64)
+    registers[observed_pitch < 48] = 0
+    registers[observed_pitch >= 72] = 2
+    is_short = raw[:, 33].numpy() <= 0.25
+    register_short = registers * 2 + is_short.astype(np.int64)
+    continuous = ((observed_pitch - 60.0) / 36.0).clip(-1.0, 1.0).astype(
+        np.float32
+    )
+    return registers, register_short, continuous
+
+
 def make_dataset(args: argparse.Namespace, split: str, max_files: int | None) -> MaestroWrongNoteDataset:
     dataset = MaestroWrongNoteDataset(
         root=args.data_root,
@@ -563,6 +578,222 @@ def evaluate_category_aware(
     }
 
 
+def best_group_adjustment(
+    base_scores: np.ndarray,
+    labels: np.ndarray,
+    total_errors: int,
+    groups: np.ndarray,
+    group_count: int,
+    requested_precision: float,
+    grid: list[float],
+    coordinate_descent: bool,
+) -> tuple[tuple[float, ...], dict]:
+    offsets = np.zeros(group_count, dtype=np.float32)
+    if coordinate_descent:
+        for _ in range(2):
+            for group in range(group_count):
+                best = None
+                for value in grid:
+                    candidate = offsets.copy()
+                    candidate[group] = value
+                    adjusted = base_scores + candidate[groups]
+                    selected = select_from_calibration(
+                        adjusted,
+                        labels,
+                        total_errors,
+                        requested_precision,
+                    )
+                    key = (
+                        selected["recall"],
+                        selected["precision"],
+                        -float(np.abs(candidate).sum()),
+                    )
+                    if best is None or key > best[0]:
+                        best = (key, candidate, selected)
+                offsets = best[1]
+        adjusted = base_scores + offsets[groups]
+        selected = select_from_calibration(
+            adjusted,
+            labels,
+            total_errors,
+            requested_precision,
+        )
+        return tuple(float(value) for value in offsets), selected
+
+    best = None
+    for values in product(grid, repeat=group_count):
+        candidate = np.asarray(values, dtype=np.float32)
+        adjusted = base_scores + candidate[groups]
+        selected = select_from_calibration(
+            adjusted,
+            labels,
+            total_errors,
+            requested_precision,
+        )
+        key = (
+            selected["recall"],
+            selected["precision"],
+            -float(np.abs(candidate).sum()),
+        )
+        if best is None or key > best[0]:
+            best = (key, values, selected)
+    return tuple(float(value) for value in best[1]), best[2]
+
+
+def evaluate_register_aware(
+    names: list[str],
+    scores: dict[str, np.ndarray],
+    blocks: dict[str, CandidateBlock],
+    target_precision: float,
+) -> dict:
+    model_index = names.index("old_small_leaf")
+    calibration_density_z, test_density_z = density_z(
+        blocks["calibration"],
+        blocks["test"],
+    )
+    calibration_register, calibration_interaction, calibration_continuous = (
+        observed_register_features(blocks["calibration"].raw)
+    )
+    test_register, test_interaction, test_continuous = observed_register_features(
+        blocks["test"].raw
+    )
+    calibration_labels = blocks["calibration"].labels.numpy().astype(np.int64)
+    test_labels = blocks["test"].labels.numpy().astype(np.int64)
+    total_calibration_errors = blocks["calibration"].stats["error_notes"]
+    total_test_errors = blocks["test"].stats["error_notes"]
+    offset_grid = [-0.04, -0.02, 0.00, 0.02, 0.04]
+    beta_grid = [-0.06, -0.04, -0.02, 0.00, 0.02, 0.04, 0.06]
+    alphas = [0.00, 0.02, 0.04, 0.06, 0.08]
+    variants = {"register": [], "register_short": [], "continuous": []}
+    for margin in [0.00, 0.01, 0.02, 0.03, 0.04, 0.05]:
+        requested_precision = target_precision + margin
+        best_by_variant = {name: None for name in variants}
+        for alpha in alphas:
+            calibration_base = (
+                scores["calibration"][:, model_index]
+                - alpha * calibration_density_z
+            )
+            test_base = scores["test"][:, model_index] - alpha * test_density_z
+            register_offsets, register_selected = best_group_adjustment(
+                calibration_base,
+                calibration_labels,
+                total_calibration_errors,
+                calibration_register,
+                3,
+                requested_precision,
+                offset_grid,
+                coordinate_descent=False,
+            )
+            interaction_offsets, interaction_selected = best_group_adjustment(
+                calibration_base,
+                calibration_labels,
+                total_calibration_errors,
+                calibration_interaction,
+                6,
+                requested_precision,
+                offset_grid,
+                coordinate_descent=True,
+            )
+            for variant_name, groups, test_groups, offsets, selected in [
+                (
+                    "register",
+                    calibration_register,
+                    test_register,
+                    register_offsets,
+                    register_selected,
+                ),
+                (
+                    "register_short",
+                    calibration_interaction,
+                    test_interaction,
+                    interaction_offsets,
+                    interaction_selected,
+                ),
+            ]:
+                adjusted_test = test_base + np.asarray(offsets)[test_groups]
+                candidate = {
+                    "base_model": "old_small_leaf",
+                    "density_alpha": alpha,
+                    "requested_precision": requested_precision,
+                    "offsets": list(offsets),
+                    "selected_calibration": selected,
+                    "selected_test": row_at_threshold(
+                        adjusted_test,
+                        test_labels,
+                        total_test_errors,
+                        selected["threshold"],
+                    ),
+                }
+                key = (
+                    selected["recall"],
+                    selected["precision"],
+                    -sum(abs(value) for value in offsets),
+                )
+                if (
+                    best_by_variant[variant_name] is None
+                    or key > best_by_variant[variant_name][0]
+                ):
+                    best_by_variant[variant_name] = (key, candidate)
+
+            for beta in beta_grid:
+                adjusted_calibration = calibration_base + beta * calibration_continuous
+                selected = select_from_calibration(
+                    adjusted_calibration,
+                    calibration_labels,
+                    total_calibration_errors,
+                    requested_precision,
+                )
+                adjusted_test = test_base + beta * test_continuous
+                candidate = {
+                    "base_model": "old_small_leaf",
+                    "density_alpha": alpha,
+                    "requested_precision": requested_precision,
+                    "pitch_beta": beta,
+                    "selected_calibration": selected,
+                    "selected_test": row_at_threshold(
+                        adjusted_test,
+                        test_labels,
+                        total_test_errors,
+                        selected["threshold"],
+                    ),
+                }
+                key = (selected["recall"], selected["precision"], -abs(beta))
+                if (
+                    best_by_variant["continuous"] is None
+                    or key > best_by_variant["continuous"][0]
+                ):
+                    best_by_variant["continuous"] = (key, candidate)
+        for name in variants:
+            variants[name].append(best_by_variant[name][1])
+
+    all_rows = [
+        (variant_name, row)
+        for variant_name, rows in variants.items()
+        for row in rows
+    ]
+    feasible = [
+        (variant_name, row)
+        for variant_name, row in all_rows
+        if row["selected_test"]["precision"] >= target_precision
+    ]
+    best_variant, best_row = max(
+        feasible or all_rows,
+        key=lambda item: (
+            item[1]["selected_test"]["recall"]
+            if item[1]["selected_test"]["precision"] >= target_precision
+            else -1.0,
+            item[1]["selected_test"]["precision"],
+        ),
+    )
+    return {
+        "pitch_source": "post_corruption_observed_pitch",
+        "register_boundaries": {"low_max": 47, "middle_max": 71},
+        "variants": variants,
+        "best_variant": best_variant,
+        "best_feasible_test": best_row,
+    }
+
+
 def train_pairwise_ranker(
     train_x: torch.Tensor,
     train_y: torch.Tensor,
@@ -718,6 +949,7 @@ def error_analysis(
 def write_markdown(path: Path, result: dict) -> None:
     fusion = result["fusion"]["best_feasible_test"]["selected_test"]
     category = result["category_aware"]["best_feasible_test"]["selected_test"]
+    register = result["register_aware"]["best_feasible_test"]["selected_test"]
     ranker = result["pairwise_ranker"]["best_feasible_test"]["selected_test"]
     lines = [
         "# Verifier Improvement Suite",
@@ -728,6 +960,7 @@ def write_markdown(path: Path, result: dict) -> None:
         "| --- | ---: | ---: | ---: |",
         f"| convex score fusion | {fusion['precision']:.4f} | {fusion['recall']:.4f} | {fusion['f1']:.4f} |",
         f"| category-aware calibration | {category['precision']:.4f} | {category['recall']:.4f} | {category['f1']:.4f} |",
+        f"| post-corruption register calibration | {register['precision']:.4f} | {register['recall']:.4f} | {register['f1']:.4f} |",
         f"| pairwise MLP ranker | {ranker['precision']:.4f} | {ranker['recall']:.4f} | {ranker['f1']:.4f} |",
         "",
         "## Error Pattern Analysis",
@@ -807,6 +1040,12 @@ def main() -> None:
         fusion,
         args.target_precision,
     )
+    register_aware = evaluate_register_aware(
+        names,
+        base_scores,
+        blocks,
+        args.target_precision,
+    )
 
     train_standardized, ranker_normalization, others = standardize(
         blocks["train"].full,
@@ -852,6 +1091,7 @@ def main() -> None:
     candidates = [
         ("fusion", fusion["best_feasible_test"]),
         ("category_aware", category_aware["best_feasible_test"]),
+        ("register_aware", register_aware["best_feasible_test"]),
         ("pairwise_ranker", ranker["best_feasible_test"]),
     ]
     best_name, best_row = max(
@@ -888,6 +1128,23 @@ def main() -> None:
                 ),
                 best_row["risk_beta"],
             )
+    elif best_name == "register_aware":
+        model_index = names.index("old_small_leaf")
+        test_scores = base_scores["test"][:, model_index]
+        _, test_density_z = density_z(
+            blocks["calibration"],
+            blocks["test"],
+        )
+        test_scores = test_scores - best_row["density_alpha"] * test_density_z
+        test_register, test_interaction, test_continuous = observed_register_features(
+            blocks["test"].raw
+        )
+        if register_aware["best_variant"] == "register":
+            test_scores += np.asarray(best_row["offsets"])[test_register]
+        elif register_aware["best_variant"] == "register_short":
+            test_scores += np.asarray(best_row["offsets"])[test_interaction]
+        else:
+            test_scores += best_row["pitch_beta"] * test_continuous
     else:
         test_scores = test_ranker_scores
     threshold = best_row["selected_calibration"]["threshold"]
@@ -906,6 +1163,7 @@ def main() -> None:
         "test_stats": blocks["test"].stats,
         "fusion": fusion,
         "category_aware": category_aware,
+        "register_aware": register_aware,
         "pairwise_ranker": ranker,
         "analysis_system": best_name,
         "error_analysis": analysis,

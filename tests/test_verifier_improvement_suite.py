@@ -11,6 +11,7 @@ from run_verifier_improvement_suite import (
     category_risk_features,
     classify_candidate_patterns,
     convex_weight_grid,
+    observed_register_features,
     split_old_and_theory_features,
 )
 
@@ -104,6 +105,19 @@ class VerifierImprovementSuiteTests(unittest.TestCase):
             adjusted,
             np.asarray([0.49, 0.455, 0.4325, 0.40], dtype=np.float32),
         )
+
+    def test_observed_register_uses_post_corruption_pitch_and_short_interaction(self) -> None:
+        raw = torch.zeros(4, 36)
+        raw[:, 0] = torch.tensor([35, 52, 76, 84], dtype=torch.float32) / 127.0
+        raw[:, 33] = torch.tensor([0.50, 0.10, 0.50, 0.10])
+
+        registers, register_short, continuous = observed_register_features(raw)
+
+        self.assertEqual(registers.tolist(), [0, 1, 2, 2])
+        self.assertEqual(register_short.tolist(), [0, 3, 4, 5])
+        self.assertLess(continuous[0], continuous[1])
+        self.assertLess(continuous[1], continuous[2])
+        self.assertLess(continuous[2], continuous[3])
 
 
 if __name__ == "__main__":

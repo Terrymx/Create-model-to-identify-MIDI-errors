@@ -1848,3 +1848,23 @@ based on duration shortness times scale confidence is searched jointly. The
 uncategorized group receives no offset, and all parameters and thresholds are
 selected only on calibration files. Test success remains `P >= 0.80` with the
 target `R > 0.60`.
+
+## 2026-06-20 - Post-Corruption Register Calibration
+
+Register calibration uses the pitch visible to a deployed reference-free
+system. Register labels are computed after synthetic corruption from the
+observed candidate pitch, never from the clean source pitch or corruption
+provenance. A replacement moved from the middle register into the treble is
+therefore classified as treble.
+
+The historical best `old_small_leaf` verifier output is retained as the base
+score. Three calibration-only adaptations are compared:
+
+1. low (`<48`), middle (`48-71`), and high (`>=72`) register offsets;
+2. six register-by-short-note offsets;
+3. a continuous signed observed-pitch adjustment.
+
+Candidate-density correction, score offsets, and the final threshold are
+selected only on calibration files. The run uses independent
+`register_aware_verifier.*` outputs and executes alongside the short/scale
+category experiment.
