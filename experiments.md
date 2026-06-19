@@ -1796,3 +1796,31 @@ Decision rules:
   confidence-weighted voice features into the detector and retrain;
 - if neither improves, use the assignment outputs for error analysis before
   attempting a learned voice-separation model.
+
+## 2026-06-19 - Candidate Ceiling Diagnosis and Verifier Improvements 1-3
+
+The first voice-aware runs accidentally used the older keyboard-aware Step 2
+checkpoints. Their low candidate recall was therefore not evidence against voice
+separation:
+
+- old Step 2 checkpoints, piece-consistent protocol: candidate recall `0.5945`;
+- correct directional-frozen checkpoints, piece features: `0.7190`;
+- correct directional-frozen checkpoints, window features: `0.7166`;
+- correct directional-frozen checkpoints, original legacy protocol: `0.7284`.
+
+The legacy-protocol result exactly reproduces the established candidate ceiling,
+confirming checkpoint selection as the root cause. The voice runner now pins the
+correct directional-frozen checkpoints.
+
+The next combined experiment reuses one candidate collection to evaluate three
+low-cost verifier improvements:
+
+1. calibration-selected convex score fusion across the old and theory-aware HGB
+   verifiers, including candidate-density adjustment;
+2. a genuine within-piece pairwise ranker trained against hard false-positive
+   candidates;
+3. FP/FN analysis by chord, scale, ornament, short-note, strong-beat,
+   high-density, and model-disagreement categories.
+
+Success criterion remains maximum recall subject to precision `>= 0.80`, with
+the immediate target `R > 0.60`.
