@@ -50,6 +50,17 @@ over the whole MIDI rather than accepting notes independently. The selector
 will penalize conflicting edits, excessive edit count, voice discontinuity, and
 harmony degradation.
 
+The local B+C experiment and global selection will now both be implemented.
+They share one cached candidate table and one set of B features:
+
+- local route: rerun edited windows and learn candidate-level C features;
+- global route: use the same shortlisted proposals in a whole-piece beam search,
+  periodically recomputing directional likelihood after accepted edits.
+
+The global route is not a brute-force search over every pitch. B retains at most
+two replacement proposals per candidate, and the beam explores only compatible
+edits above a calibration-selected proposal floor.
+
 ### Priority 3: Risk-controlled calibration
 
 After ranking improves, use piece-level conformal or false-discovery-rate
@@ -110,6 +121,32 @@ on a local radius around the candidate:
 The default local radii are `4`, `8`, and `16` notes. B scores all proposals;
 C reruns at most the best two proposals per candidate.
 
+### D: Whole-piece counterfactual beam search
+
+The whole-piece route consumes B-shortlisted proposals and processes them in
+temporal order. A beam state contains:
+
+- the accepted edit set;
+- the current observed MIDI feature sequence;
+- cumulative B and C gains;
+- cumulative whole-piece directional-likelihood change;
+- edit-count and edit-conflict penalties.
+
+At each candidate, the beam can keep the note unchanged or accept one proposed
+replacement. States are pruned by a calibration-selected objective:
+
+`state_score = edit_gain + neighborhood_gain + global_gain - edit_cost - conflict_cost`
+
+To control cost, whole-piece likelihood is not recomputed for every rejected
+branch. It is recomputed after accepted edits in batches and cached by the edit
+set hash. Initial experiments use beam widths `4`, `8`, and `16`, with a maximum
+edit budget tied to piece note count and candidate density.
+
+The global selector reports both independent-edit and beam-selected detection
+metrics. It proceeds regardless of whether local C exceeds the current frontier,
+because joint edits may expose collective sequence effects that independent
+ranking cannot measure.
+
 ### Proposal and decision structure
 
 Each candidate produces rows of:
@@ -137,10 +174,14 @@ Evaluation reports both:
 | C1 | B3 + radius-4 edited-neighborhood delta |
 | C2 | C1 + radii 8/16 |
 | C3 | C2 + confident same-voice delta |
+| D1 | B3 proposals + whole-piece beam, no C features |
+| D2 | C2 proposals + whole-piece beam |
+| D3 | C3 proposals + whole-piece beam and voice-conflict penalty |
 
-The first success gate is B2/B3 improving recall over `0.5963` at precision
-`>=0.80`. Neighborhood reruns proceed even if the gain is small, but global
-edit decoding proceeds only if B+C produces a repeatable improvement.
+The first success gate is any B/C/D variant improving recall over `0.5963` at
+precision `>=0.80`. Local and global routes are both executed; a route is
+retained only if its calibration-selected operating point improves the matched
+baseline on test.
 
 ## Leakage and Protocol Requirements
 
