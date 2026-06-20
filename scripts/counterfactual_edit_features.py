@@ -24,6 +24,125 @@ COUNTERFACTUAL_TARGET_FEATURE_NAMES = (
 )
 
 
+def correction_pitch_distribution(
+    outputs: dict[str, torch.Tensor],
+) -> torch.Tensor:
+    correction_logits = outputs.get("correction_logits")
+    if correction_logits is not None:
+        probability = torch.softmax(correction_logits, dim=-1)[..., :128]
+        return probability / probability.sum(dim=-1, keepdim=True).clamp_min(1e-9)
+    pitch_logits = outputs.get("pitch_logits")
+    if pitch_logits is None:
+        raise ValueError("Model outputs contain no pitch or correction logits.")
+    return torch.softmax(pitch_logits, dim=-1)
+
+
+def apply_observed_pitch_edit(
+    raw_features: torch.Tensor,
+    positions: torch.Tensor,
+    proposed_pitch: torch.Tensor,
+) -> torch.Tensor:
+    if raw_features.ndim != 3:
+        raise ValueError("Raw features must have shape [batch, length, features].")
+    if positions.ndim != 1 or proposed_pitch.ndim != 1:
+        raise ValueError("Positions and pitches must be one-dimensional.")
+    if len(positions) != len(raw_features) or len(proposed_pitch) != len(raw_features):
+        raise ValueError("One edit position and pitch are required per batch row.")
+    edited = raw_features.clone()
+    row = torch.arange(len(edited), device=edited.device)
+    position = positions.long().clamp(0, edited.shape[1] - 1)
+    pitch = proposed_pitch.float().clamp(0, 127)
+    phase = 2.0 * torch.pi * torch.remainder(pitch, 12.0) / 12.0
+    edited[row, position, 0] = pitch / 127.0
+    edited[row, position, 6] = torch.sin(phase)
+    edited[row, position, 7] = torch.cos(phase)
+    return edited
+
+
+def local_edit_impact_features(
+    original_forward_log_probability: torch.Tensor,
+    original_backward_log_probability: torch.Tensor,
+    edited_forward_log_probability: torch.Tensor,
+    edited_backward_log_probability: torch.Tensor,
+    positions: torch.Tensor,
+    mask: torch.Tensor,
+    radii: tuple[int, ...] = (4, 8, 16),
+) -> torch.Tensor:
+    shapes = {
+        tuple(original_forward_log_probability.shape),
+        tuple(original_backward_log_probability.shape),
+        tuple(edited_forward_log_probability.shape),
+        tuple(edited_backward_log_probability.shape),
+        tuple(mask.shape),
+    }
+    if len(shapes) != 1:
+        raise ValueError("Likelihood and mask tensors must have equal shapes.")
+    forward_delta = edited_forward_log_probability - original_forward_log_probability
+    backward_delta = edited_backward_log_probability - original_backward_log_probability
+    combined_delta = 0.5 * (forward_delta + backward_delta)
+    rows = []
+    for row_index, center_value in enumerate(positions.tolist()):
+        values = []
+        for radius in radii:
+            left = max(0, int(center_value) - radius)
+            right = min(mask.shape[1], int(center_value) + radius + 1)
+            valid = mask[row_index, left:right].bool()
+            count = int(valid.sum())
+            if count == 0:
+                values.extend([0.0] * 5)
+                continue
+            forward_sum = float(forward_delta[row_index, left:right][valid].sum())
+            backward_sum = float(backward_delta[row_index, left:right][valid].sum())
+            combined = combined_delta[row_index, left:right][valid]
+            combined_sum = float(combined.sum())
+            improved_fraction = float((combined > 0).float().mean())
+            agreement = float(
+                (forward_sum >= 0 and backward_sum >= 0)
+                or (forward_sum < 0 and backward_sum < 0)
+            )
+            values.extend(
+                [
+                    forward_sum,
+                    backward_sum,
+                    combined_sum,
+                    improved_fraction,
+                    agreement,
+                ]
+            )
+        rows.append(values)
+    return torch.tensor(
+        rows,
+        dtype=original_forward_log_probability.dtype,
+        device=original_forward_log_probability.device,
+    )
+
+
+@torch.no_grad()
+def directional_pitch_distribution(
+    model: torch.nn.Module,
+    raw_features: torch.Tensor,
+    mask: torch.Tensor,
+    direction: str,
+    safe_columns: list[int],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if direction not in {"forward", "backward"}:
+        raise ValueError("Direction must be 'forward' or 'backward'.")
+    directional = raw_features[:, :, safe_columns]
+    oriented_mask = mask.bool()
+    if direction == "backward":
+        directional = directional.flip(1)
+        oriented_mask = oriented_mask.flip(1)
+    shifted = torch.zeros_like(directional)
+    shifted[:, 1:] = directional[:, :-1]
+    available = oriented_mask.clone()
+    available[:, 0] = False
+    probability = torch.softmax(model.predict_pitch(shifted, causal=True), dim=-1)
+    if direction == "backward":
+        probability = probability.flip(1)
+        available = available.flip(1)
+    return probability, available
+
+
 def build_replacement_proposals(
     detector_probability: torch.Tensor,
     forward_probability: torch.Tensor,

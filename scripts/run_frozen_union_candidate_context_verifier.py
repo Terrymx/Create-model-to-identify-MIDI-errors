@@ -27,6 +27,7 @@ from train_directional_likelihood import DIRECTIONAL_SAFE_FEATURE_COLUMNS
 from verifier_theory_features import build_theory_interaction_features
 from voice_assignment import VOICE_FEATURE_SIZE
 from voice_aware_dataset import PieceConsistentVoiceDataset
+from counterfactual_edit_features import correction_pitch_distribution
 
 
 class IndexedSubset(Dataset):
@@ -278,6 +279,7 @@ def detector_signals(
         "features": torch.stack(encoded_features, dim=-1),
         "probability": probability,
         "available": available.bool(),
+        "pitch_distribution": correction_pitch_distribution(outputs),
     }
 
 

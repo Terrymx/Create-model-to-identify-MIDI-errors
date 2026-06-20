@@ -1887,3 +1887,21 @@ likelihood.
 
 The current implementation roadmap and B+C design are maintained in
 `OPTIMIZATION_PLAN.md`.
+
+## 2026-06-20 - Counterfactual B+C Implementation
+
+The first counterfactual implementation is limited to replacement evidence:
+
+- B proposes pitches from the three-class correction head and frozen forward /
+  backward teachers;
+- B computes target-only bidirectional log-likelihood gain without rerunning a
+  window;
+- C retains the two strongest B proposals and edits only inference-visible pitch
+  columns `0/6/7`;
+- C measures edited-neighborhood likelihood deltas at radii `4/8/16`;
+- clean target pitch is stored only for correction Top-1/Top-3 reporting and is
+  not accepted by proposal or feature APIs.
+
+The formal runner writes B results before starting the more expensive C cache,
+so the stages are independently recoverable. Primary detection success remains
+recall above `0.5963` at precision `>=0.80`.
