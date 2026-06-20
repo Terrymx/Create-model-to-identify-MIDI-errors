@@ -1905,3 +1905,36 @@ The first counterfactual implementation is limited to replacement evidence:
 The formal runner writes B results before starting the more expensive C cache,
 so the stages are independently recoverable. Primary detection success remains
 recall above `0.5963` at precision `>=0.80`.
+
+## 2026-06-21 - Counterfactual B+C Result and Whole-Piece D
+
+The formal B+C experiment produced the first result above the `R=0.60` target:
+
+- B1: `P=0.8049`, `R=0.5911`;
+- B2: `P=0.8014`, `R=0.5968`;
+- B3: `P=0.8003`, `R=0.5972`;
+- C1, radius 4: `P=0.8010`, `R=0.6048`, `F1=0.6892`;
+- C2, radii 4/8/16: `P=0.8089`, `R=0.5994`.
+
+C1 also achieved replacement correction Top-1 `0.6530` and Top-3 `0.8613`
+among detected replacement errors. This supports the paper hypothesis that a
+concrete edit improving local bidirectional sequence likelihood is stronger
+evidence than adding more static candidate descriptors.
+
+The next D experiment changes the evaluation protocol before adding global
+selection. Legacy overlapping windows synthesize corruption independently, so
+they cannot be stitched into a scientifically valid whole-piece state. D
+therefore:
+
+1. corrupts every complete MIDI piece once, after which windows are sliced;
+2. deduplicates candidates by `(piece, absolute note position)`, retaining the
+   occurrence farthest from a window boundary;
+3. retrains and calibrates a matched C1 verifier on deduplicated candidates;
+4. compares D1/D2/D3 whole-piece beam selection with calibrated edit budgets
+   and local conflict penalties;
+5. counts every unique corrupted note in the recall denominator, including
+   errors outside the candidate set.
+
+The historical C1 result remains a reference, but only matched C1 versus D is a
+strict comparison under the new piece-consistent protocol. A 4-validation-file,
+2-test-file end-to-end smoke run completed successfully before the formal run.

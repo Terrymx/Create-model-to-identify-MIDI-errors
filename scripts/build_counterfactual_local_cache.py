@@ -18,6 +18,7 @@ from counterfactual_edit_features import (
 )
 from midi_error_detector.data import MaestroWrongNoteDataset
 from run_frozen_union_candidate_context_verifier import load_any_model
+from voice_aware_dataset import PieceConsistentVoiceDataset
 
 
 def top_proposal_indices(scores: np.ndarray, count: int = 2) -> np.ndarray:
@@ -41,10 +42,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--error-rate", type=float, default=0.01)
     parser.add_argument("--max-validation-files", type=int, default=None)
     parser.add_argument("--max-test-files", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=41)
+    parser.add_argument("--piece-consistent", action="store_true")
     return parser.parse_args()
 
 
 def make_dataset(args: argparse.Namespace, split: str):
+    if args.piece_consistent:
+        return PieceConsistentVoiceDataset(
+            root=args.data_root,
+            split=split,
+            voice_method="onset_matching",
+            window_size=args.window_size,
+            stride=args.stride,
+            error_rate=args.error_rate,
+            seed=args.seed,
+            max_files=(
+                args.max_validation_files
+                if split == "validation"
+                else args.max_test_files
+            ),
+            verbose=True,
+        )
     dataset = MaestroWrongNoteDataset(
         root=args.data_root,
         split=split,

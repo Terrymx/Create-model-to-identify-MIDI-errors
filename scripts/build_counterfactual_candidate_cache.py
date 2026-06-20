@@ -21,6 +21,7 @@ from run_frozen_union_candidate_context_verifier import (
 )
 from run_union_candidate_verifier import split_indices_by_file
 from run_verifier_improvement_suite import collect_block, make_dataset
+from voice_aware_dataset import PieceConsistentVoiceDataset
 
 
 def aggregate_proposal_features(
@@ -107,6 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=41)
     parser.add_argument("--max-validation-files", type=int, default=None)
     parser.add_argument("--max-test-files", type=int, default=None)
+    parser.add_argument("--piece-consistent", action="store_true")
     return parser.parse_args()
 
 
@@ -155,6 +157,7 @@ def collect_counterfactual_arrays(
         "positions": [],
         "dataset_indices": [],
         "local_positions": [],
+        "file_note_counts": [],
     }
     for batch in tqdm(
         make_counterfactual_loader(dataset, indices, batch_size),
@@ -251,6 +254,9 @@ def collect_counterfactual_arrays(
         local_positions = torch.arange(length).view(1, length).expand(
             batch_size_value, length
         )
+        file_note_counts = batch["__file_note_count"].view(
+            batch_size_value, 1
+        ).expand(batch_size_value, length)
         positions = window_starts + local_positions
         candidate_mask_cpu = candidate_mask.cpu()
         rows["labels"].append(labels[candidate_mask].cpu())
@@ -264,6 +270,9 @@ def collect_counterfactual_arrays(
         rows["positions"].append(positions[candidate_mask_cpu].cpu())
         rows["dataset_indices"].append(dataset_indices[candidate_mask_cpu].cpu())
         rows["local_positions"].append(local_positions[candidate_mask_cpu].cpu())
+        rows["file_note_counts"].append(
+            file_note_counts[candidate_mask_cpu].cpu()
+        )
     if not rows["labels"]:
         raise RuntimeError(f"No candidates collected for {description}.")
     return {
@@ -301,6 +310,10 @@ def build_and_save_split(
     np.testing.assert_array_equal(block.labels.numpy(), arrays["labels"])
     np.testing.assert_array_equal(block.file_ids.numpy(), arrays["file_ids"])
     arrays["base_features"] = block.old.numpy()
+    np.testing.assert_array_equal(
+        block.note_counts.numpy(),
+        arrays["file_note_counts"],
+    )
     arrays["aggregated_b_features"] = aggregate_proposal_features(
         arrays["b_features"],
         arrays["b_ranking"],
@@ -313,7 +326,20 @@ def build_and_save_split(
         "binary_candidate_threshold": 0.50,
         "pitch_source": "post_corruption_observed_pitch",
         "proposal_sources": ["threeclass_correction", "forward", "backward"],
+        "piece_consistent": bool(args.piece_consistent),
+        "window_size": int(args.window_size),
     }
+    if args.piece_consistent:
+        file_ids = sorted({dataset.index[index][0] for index in indices})
+        metadata["stats"]["unique_notes"] = int(
+            sum(dataset._note_counts[file_id] for file_id in file_ids)
+        )
+        metadata["stats"]["unique_error_notes"] = int(
+            sum(
+                int(dataset._pieces[file_id].is_error.sum())
+                for file_id in file_ids
+            )
+        )
     save_candidate_cache(
         Path(args.output_dir) / f"{split_name}.npz",
         arrays,
@@ -333,11 +359,37 @@ def main() -> None:
         *load_any_model(args.forward_checkpoint, device),
         *load_any_model(args.backward_checkpoint, device),
     )
-    validation = make_dataset(args, "validation", args.max_validation_files)
+    if args.piece_consistent:
+        validation = PieceConsistentVoiceDataset(
+            root=args.data_root,
+            split="validation",
+            voice_method="onset_matching",
+            window_size=args.window_size,
+            stride=args.stride,
+            error_rate=args.error_rate,
+            seed=args.seed,
+            max_files=args.max_validation_files,
+            verbose=True,
+        )
+    else:
+        validation = make_dataset(args, "validation", args.max_validation_files)
     train_indices, calibration_indices, train_files, calibration_files = (
         split_indices_by_file(validation, 0.25, args.seed)
     )
-    test = make_dataset(args, "test", args.max_test_files)
+    if args.piece_consistent:
+        test = PieceConsistentVoiceDataset(
+            root=args.data_root,
+            split="test",
+            voice_method="onset_matching",
+            window_size=args.window_size,
+            stride=args.stride,
+            error_rate=args.error_rate,
+            seed=args.seed,
+            max_files=args.max_test_files,
+            verbose=True,
+        )
+    else:
+        test = make_dataset(args, "test", args.max_test_files)
     results = {
         "train": build_and_save_split(
             models, validation, train_indices, device, args, "train"
