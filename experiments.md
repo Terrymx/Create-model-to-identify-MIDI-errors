@@ -1868,3 +1868,22 @@ Candidate-density correction, score offsets, and the final threshold are
 selected only on calibration files. The run uses independent
 `register_aware_verifier.*` outputs and executes alongside the short/scale
 category experiment.
+
+## 2026-06-20 - Updated Optimization Direction
+
+The category-aware and post-corruption register experiments completed without
+beating the historical frontier:
+
+- category-aware calibration: `P=0.8041`, `R=0.5928`;
+- post-corruption register calibration: `P=0.8051`, `R=0.5917`;
+- historical best: `P=0.8008`, `R=0.5963`.
+
+Manual context partitioning remains useful as auxiliary evidence, but further
+threshold splitting is no longer the primary path. The next experiment uses
+bidirectional counterfactual edit gain: compare each observed replacement
+candidate with concrete proposed pitches under frozen forward and backward
+music models, then measure whether editing the MIDI improves local sequence
+likelihood.
+
+The current implementation roadmap and B+C design are maintained in
+`OPTIMIZATION_PLAN.md`.
