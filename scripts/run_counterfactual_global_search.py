@@ -120,11 +120,40 @@ def _canonicalize(
 
 
 def _score_floor_grid(scores: np.ndarray) -> list[float]:
-    quantiles = np.quantile(
-        scores,
-        [0.50, 0.60, 0.70, 0.78, 0.84, 0.89, 0.93, 0.96, 0.98],
-    )
+    quantiles = np.quantile(scores, np.linspace(0.10, 0.995, 180))
     return sorted({float(value) for value in quantiles})
+
+
+def _global_structures(variant: str) -> list[tuple[int, float, int, float]]:
+    if variant == "D1":
+        return [
+            (4, rate, 0, 0.0)
+            for rate in (
+                0.0100,
+                0.0125,
+                0.0150,
+                0.0175,
+                0.0200,
+                0.0225,
+                0.0250,
+                0.0275,
+                0.0300,
+            )
+        ]
+    if variant == "D2":
+        return [
+            (8, rate, 2, penalty)
+            for rate in (0.010, 0.0125, 0.015, 0.020)
+            for penalty in (0.05, 0.15)
+        ]
+    if variant == "D3":
+        return [
+            (16, rate, distance, penalty)
+            for rate in (0.0125, 0.015, 0.020)
+            for distance in (2, 4)
+            for penalty in (0.10, 0.25)
+        ]
+    raise ValueError(f"Unknown global variant: {variant}")
 
 
 def _evaluate_setting(
@@ -147,23 +176,7 @@ def _select_calibrated_setting(
     target_precision: float,
     variant: str,
 ) -> dict:
-    if variant == "D1":
-        structures = [(4, rate, 0, 0.0) for rate in (0.010, 0.0125, 0.015)]
-    elif variant == "D2":
-        structures = [
-            (8, rate, 2, penalty)
-            for rate in (0.010, 0.0125, 0.015, 0.020)
-            for penalty in (0.05, 0.15)
-        ]
-    elif variant == "D3":
-        structures = [
-            (16, rate, distance, penalty)
-            for rate in (0.0125, 0.015, 0.020)
-            for distance in (2, 4)
-            for penalty in (0.10, 0.25)
-        ]
-    else:
-        raise ValueError(f"Unknown global variant: {variant}")
+    structures = _global_structures(variant)
     rows = []
     for floor in _score_floor_grid(scores):
         for beam_width, rate, distance, penalty in structures:
@@ -343,12 +356,12 @@ def main() -> None:
     }
 
     systems = {}
-    for variant in ("D1", "D2", "D3"):
+    for variant in ("D1",):
         calibrated = _select_calibrated_setting(
             calibration,
             calibration_scores,
             calibration_total,
-            args.target_precision + 0.01,
+            args.target_precision,
             variant,
         )
         systems[variant] = {

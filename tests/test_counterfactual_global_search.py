@@ -5,6 +5,8 @@ import unittest
 import numpy as np
 
 from run_counterfactual_global_search import (
+    _global_structures,
+    _score_floor_grid,
     canonical_candidate_indices,
     detection_metrics,
     select_global_predictions,
@@ -59,6 +61,16 @@ class CounterfactualGlobalSearchTests(unittest.TestCase):
         self.assertEqual(metrics["fn"], 3)
         self.assertAlmostEqual(metrics["precision"], 0.5)
         self.assertAlmostEqual(metrics["recall"], 0.25)
+
+    def test_recalibration_uses_dense_floors_and_wider_d1_budgets(self) -> None:
+        floors = _score_floor_grid(np.linspace(0.0, 1.0, 1001))
+        structures = _global_structures("D1")
+
+        self.assertGreaterEqual(len(floors), 100)
+        self.assertTrue(any(rate == 0.03 for _, rate, _, _ in structures))
+        self.assertTrue(
+            all(distance == 0 and penalty == 0.0 for _, _, distance, penalty in structures)
+        )
 
 
 if __name__ == "__main__":

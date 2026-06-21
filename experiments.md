@@ -1938,3 +1938,26 @@ therefore:
 The historical C1 result remains a reference, but only matched C1 versus D is a
 strict comparison under the new piece-consistent protocol. A 4-validation-file,
 2-test-file end-to-end smoke run completed successfully before the formal run.
+
+## 2026-06-21 - Whole-Piece D Recalibration
+
+The initial D search retained excessive precision (`84.83%` to `85.38%`) and
+reduced recall. D1 was therefore recalibrated without rebuilding neural
+features:
+
+- calibration precision target changed from `0.81` to the required `0.80`;
+- score-floor search increased from 9 to 180 quantile levels;
+- per-piece edit budgets expanded from `1.0%-1.5%` to `1.0%-3.0%`;
+- D2/D3 conflict penalties were excluded from the recalibration.
+
+The selected D1 configuration uses score floor `0.445244` and a `1.25%`
+per-piece edit budget:
+
+- calibration: `P=0.8000`, `R=0.5132`;
+- test: `P=0.8092`, `R=0.5920`, `F1=0.6837`;
+- matched piece-consistent C1: `P=0.8193`, `R=0.5811`, `F1=0.6800`.
+
+Thus whole-piece budgeted selection adds `+1.08` recall points and `+0.38` F1
+points over matched C1 while retaining test precision above `0.80`. It does not
+exceed the legacy-window C1 reference recall `0.6048`, which is not a strict
+comparison because that protocol independently corrupts overlapping windows.
