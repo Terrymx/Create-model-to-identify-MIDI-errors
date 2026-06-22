@@ -20,8 +20,10 @@ class IncrementalGlobalContextDTests(unittest.TestCase):
 
         def score_all(edits):
             positions = {edit.position for edit in edits}
-            if 10 in positions:
-                return np.asarray([0.9, 0.8])
+            if positions == {10, 20}:
+                return np.asarray([0.1, 0.1])
+            if positions == {10}:
+                return np.asarray([0.1, 0.8])
             return np.asarray([0.9, 0.2])
 
         result = incremental_beam_search(
@@ -37,12 +39,19 @@ class IncrementalGlobalContextDTests(unittest.TestCase):
             [edit.position for edit in result.edits],
             [10, 20],
         )
+        self.assertAlmostEqual(result.score, 1.5)
 
     def test_one_edit_per_position_and_deterministic_pruning(self) -> None:
         proposals = {0: (61, 62), 1: (70, 71)}
 
         def score_all(edits):
-            return np.asarray([0.8, 0.7])
+            positions = {edit.position for edit in edits}
+            return np.asarray(
+                [
+                    0.1 if 10 in positions else 0.8,
+                    0.1 if 20 in positions else 0.7,
+                ]
+            )
 
         first = incremental_beam_search(
             candidate_positions=np.asarray([10, 20]),

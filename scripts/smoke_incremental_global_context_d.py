@@ -11,7 +11,8 @@ from joblib import load
 
 from incremental_global_context import PieceEdit
 from incremental_piece_scorer import IncrementalPieceScorer
-from run_counterfactual_piece_b import load_canonical_split
+from run_counterfactual_edit_verifier import build_c_variant_features
+from run_counterfactual_global_search import canonical_candidate_indices
 from run_frozen_union_candidate_context_verifier import load_any_model
 from voice_aware_dataset import PieceConsistentVoiceDataset
 
@@ -35,7 +36,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    arrays, _ = load_canonical_split(Path(args.cache_dir), args.split, 256)
+    with np.load(
+        Path(args.cache_dir) / f"{args.split}.npz",
+        allow_pickle=False,
+    ) as loaded:
+        arrays = {
+            name: loaded[name].copy()
+            for name in loaded.files
+            if name != "__metadata__"
+        }
     counts = {
         int(file_id): int((arrays["file_ids"] == file_id).sum())
         for file_id in np.unique(arrays["file_ids"])
@@ -49,6 +58,11 @@ def main() -> None:
     piece_arrays["window_starts"] = (
         piece_arrays["positions"] - piece_arrays["local_positions"]
     ).astype(np.int64)
+    canonical_rows = canonical_candidate_indices(piece_arrays, 256)
+    canonical_arrays = {
+        name: values[canonical_rows]
+        for name, values in piece_arrays.items()
+    }
     dataset = PieceConsistentVoiceDataset(
         root=args.data_root,
         split=args.split,
@@ -66,34 +80,52 @@ def main() -> None:
         *load_any_model(args.forward_checkpoint, device),
         *load_any_model(args.backward_checkpoint, device),
     )
+    verifier_model = load(args.verifier_checkpoint)
     scorer = IncrementalPieceScorer(
         piece_id=piece_id,
         piece_features=dataset._pieces[piece_id].features,
         candidate_arrays=piece_arrays,
+        output_rows=canonical_rows,
         models=models,
-        verifier_model=load(args.verifier_checkpoint),
+        verifier_model=verifier_model,
         device=device,
     )
     start = time.perf_counter()
     baseline = scorer.score_all(())
     baseline_seconds = time.perf_counter() - start
+    cached_features = build_c_variant_features(
+        piece_arrays["base_features"],
+        piece_arrays["b_features"],
+        piece_arrays["b_ranking"],
+        piece_arrays["c_features"],
+        piece_arrays["c_ranking"],
+        "C2",
+        b_variant="B2",
+    )
+    cached_scores = verifier_model.predict_proba(cached_features)[:, 1][
+        canonical_rows
+    ]
     row = int(np.argmax(baseline))
-    best_slot = int(np.argmax(piece_arrays["c_ranking"][row]))
+    best_slot = int(np.argmax(canonical_arrays["c_ranking"][row]))
     edit = PieceEdit(
-        int(piece_arrays["positions"][row]),
-        int(piece_arrays["c_proposals"][row, best_slot]),
+        int(canonical_arrays["positions"][row]),
+        int(canonical_arrays["c_proposals"][row, best_slot]),
     )
     start = time.perf_counter()
     edited = scorer.score_all((edit,))
     edited_seconds = time.perf_counter() - start
     result = {
         "piece_id": piece_id,
-        "candidate_count": len(rows),
+        "candidate_count": len(canonical_rows),
+        "window_candidate_rows": len(rows),
         "edit": {
             "position": edit.position,
             "proposed_pitch": edit.proposed_pitch,
         },
         "baseline_seconds": baseline_seconds,
+        "baseline_cached_max_difference": float(
+            np.max(np.abs(baseline - cached_scores))
+        ),
         "edited_seconds": edited_seconds,
         "window_cache_hits": scorer.window_cache.hits,
         "window_cache_misses": scorer.window_cache.misses,

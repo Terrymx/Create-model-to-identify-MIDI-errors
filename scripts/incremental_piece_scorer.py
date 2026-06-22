@@ -41,6 +41,7 @@ class IncrementalPieceScorer:
         piece_id: int,
         piece_features: np.ndarray,
         candidate_arrays: dict[str, np.ndarray],
+        output_rows: np.ndarray | None,
         models: tuple,
         verifier_model,
         device: torch.device,
@@ -48,6 +49,11 @@ class IncrementalPieceScorer:
     ) -> None:
         self.piece_id = int(piece_id)
         self.arrays = candidate_arrays
+        self.output_rows = (
+            np.arange(len(candidate_arrays["labels"]), dtype=np.int64)
+            if output_rows is None
+            else output_rows.astype(np.int64)
+        )
         self.models = models
         self.verifier_model = verifier_model
         self.device = device
@@ -94,6 +100,7 @@ class IncrementalPieceScorer:
             piece_relative_size=PIECE_RELATIVE_SIZE,
         )
         b_features = self._dynamic_b_features(window_outputs, local_positions)
+        b_ranking = b_features[..., 2]
         c_features = self._dynamic_c_features(
             window_outputs,
             local_positions,
@@ -102,13 +109,17 @@ class IncrementalPieceScorer:
         features = build_c_variant_features(
             base_features.numpy(),
             b_features,
-            self.arrays["b_ranking"],
+            b_ranking,
             c_features,
-            self.arrays["c_ranking"],
+            np.take_along_axis(
+                b_ranking,
+                self.arrays["c_proposal_slots"],
+                axis=1,
+            ),
             "C2",
             b_variant="B2",
         )
-        scores = self.verifier_model.predict_proba(features)[:, 1]
+        scores = self.verifier_model.predict_proba(features)[:, 1][self.output_rows]
         self.score_cache[key] = scores
         return scores
 
