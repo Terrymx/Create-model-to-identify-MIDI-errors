@@ -1961,3 +1961,33 @@ Thus whole-piece budgeted selection adds `+1.08` recall points and `+0.38` F1
 points over matched C1 while retaining test precision above `0.80`. It does not
 exceed the legacy-window C1 reference recall `0.6048`, which is not a strict
 comparison because that protocol independently corrupts overlapping windows.
+
+## 2026-06-22 - Piece-Consistent Detector Threshold Sweep
+
+The frozen three-class and binary detectors were evaluated on complete-piece
+corruption with one score per unique absolute note. Threshold pairs were
+selected on validation and then applied unchanged to test.
+
+At the inherited thresholds `(three=0.60, binary=0.50)`:
+
+- validation candidate recall: `0.6961`, candidate rate: `1.39%`;
+- test candidate recall: `0.7296`, candidate rate: `1.42%`;
+- test candidate precision: `0.5549`.
+
+At the validation-selected two-times candidate budget
+`(three=0.30, binary=0.25)`:
+
+- validation candidate recall: `0.8016`, candidate rate: `2.70%`;
+- test candidate recall: `0.8328`, candidate rate: `2.55%`;
+- test candidate precision: `0.3526`.
+
+The binary detector alone reaches test candidate recall `0.8180` at threshold
+`0.25`; the three-class detector alone reaches `0.7541` at threshold `0.30`.
+Their union recovers another `1.48` recall points.
+
+This shows that legacy-window training did not destroy detector transfer to the
+piece-consistent protocol. The immediate bottleneck is inherited candidate
+threshold calibration, not detector capacity. Before retraining detectors, the
+next controlled experiment should rebuild B/C/D caches at `(0.30, 0.25)` and
+measure whether the verifier can retain precision `>=0.80` while exploiting the
+additional candidate recall ceiling.
