@@ -265,6 +265,8 @@ def collect_block(
     description: str,
 ) -> CandidateBlock:
     collect_args = SimpleNamespace(surprise_eval_groups=4)
+    three_threshold = getattr(args, "threeclass_candidate_threshold", 0.60)
+    binary_threshold = getattr(args, "binary_candidate_threshold", 0.50)
     (
         features,
         labels,
@@ -280,8 +282,8 @@ def collect_block(
         make_loader(dataset, indices, args.batch_size),
         device,
         collect_args,
-        0.60,
-        0.50,
+        three_threshold,
+        binary_threshold,
         description,
     )
     raw = features[:, :36].clone()

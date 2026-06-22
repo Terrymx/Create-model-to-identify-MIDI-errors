@@ -40,6 +40,20 @@ def aggregate_proposal_features(
     return np.concatenate([flattened, maximum, mean, best], axis=1).astype(np.float32)
 
 
+def candidate_mask_from_probabilities(
+    valid: torch.Tensor,
+    three_probability: torch.Tensor,
+    binary_probability: torch.Tensor,
+    *,
+    three_threshold: float,
+    binary_threshold: float,
+) -> torch.Tensor:
+    return valid & (
+        (three_probability >= three_threshold)
+        | (binary_probability >= binary_threshold)
+    )
+
+
 def save_candidate_cache(
     path: Path,
     arrays: dict[str, np.ndarray],
@@ -109,6 +123,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-validation-files", type=int, default=None)
     parser.add_argument("--max-test-files", type=int, default=None)
     parser.add_argument("--piece-consistent", action="store_true")
+    parser.add_argument("--threeclass-candidate-threshold", type=float, default=0.60)
+    parser.add_argument("--binary-candidate-threshold", type=float, default=0.50)
     return parser.parse_args()
 
 
@@ -134,6 +150,8 @@ def collect_counterfactual_arrays(
     device: torch.device,
     batch_size: int,
     description: str,
+    three_threshold: float,
+    binary_threshold: float,
 ) -> dict[str, np.ndarray]:
     (
         three_model,
@@ -213,9 +231,12 @@ def collect_counterfactual_arrays(
             & forward_available
             & backward_available
         )
-        candidate_mask = valid & (
-            (three["probability"] >= 0.60)
-            | (binary["probability"] >= 0.50)
+        candidate_mask = candidate_mask_from_probabilities(
+            valid,
+            three["probability"],
+            binary["probability"],
+            three_threshold=three_threshold,
+            binary_threshold=binary_threshold,
         )
         if not bool(candidate_mask.any()):
             continue
@@ -304,6 +325,8 @@ def build_and_save_split(
         device,
         args.batch_size,
         f"collect counterfactual {split_name}",
+        args.threeclass_candidate_threshold,
+        args.binary_candidate_threshold,
     )
     if len(block.labels) != len(arrays["labels"]):
         raise RuntimeError("Base and counterfactual candidate counts differ.")
@@ -322,8 +345,8 @@ def build_and_save_split(
         "split": split_name,
         "candidate_count": len(block.labels),
         "stats": block.stats,
-        "threeclass_candidate_threshold": 0.60,
-        "binary_candidate_threshold": 0.50,
+        "threeclass_candidate_threshold": args.threeclass_candidate_threshold,
+        "binary_candidate_threshold": args.binary_candidate_threshold,
         "pitch_source": "post_corruption_observed_pitch",
         "proposal_sources": ["threeclass_correction", "forward", "backward"],
         "piece_consistent": bool(args.piece_consistent),
