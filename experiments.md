@@ -1991,3 +1991,29 @@ threshold calibration, not detector capacity. Before retraining detectors, the
 next controlled experiment should rebuild B/C/D caches at `(0.30, 0.25)` and
 measure whether the verifier can retain precision `>=0.80` while exploiting the
 additional candidate recall ceiling.
+
+## 2026-06-22 - Expanded-Candidate B/C and D
+
+Piece-consistent B caches were rebuilt at detector thresholds
+`(three=0.30, binary=0.25)`. Under unique-note scoring, B2 was the strongest B
+variant before C augmentation. The subsequent fair C comparison fixed every
+HGB seed to `41` and selected thresholds at calibration precision `>=0.81`.
+
+Test results:
+
+- B2: `P=0.8219`, `R=0.5610`, `F1=0.6668`;
+- B2+C(4): `P=0.8154`, `R=0.5792`, `F1=0.6773`;
+- B2+C(4/8/16): `P=0.8073`, `R=0.5892`, `F1=0.6813`;
+- B3+C(4): `P=0.8145`, `R=0.5785`, `F1=0.6765`;
+- B3+C(4/8/12): `P=0.8098`, `R=0.5840`, `F1=0.6786`.
+
+Thus B2+C(4/8/16) is the best retained C system. Its matched D1 experiment used
+the same seed and calibration precision margin. D1 selected beam width `4`,
+score floor `0.663694`, and per-piece edit budget `1.25%`, producing:
+
+- matched B2+C(4/8/16): `P=0.8073`, `R=0.5892`, `F1=0.6813`;
+- D1: `P=0.8107`, `R=0.5850`, `F1=0.6796`.
+
+D1 increased precision but lost `0.42` recall points and `0.17` F1 points, so
+it is rejected. The current frontier under the unified piece-consistent,
+unique-note protocol remains B2+C(4/8/16).

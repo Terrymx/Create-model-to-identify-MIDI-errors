@@ -10,6 +10,19 @@ import numpy as np
 from counterfactual_beam_search import EditCandidate, beam_search_edits
 
 
+def global_feature_spec(b_variant: str, c_variant: str) -> dict[str, str]:
+    if b_variant not in {"B1", "B2", "B3"}:
+        raise ValueError(f"Unknown B variant: {b_variant}")
+    if c_variant not in {"C1", "C2"}:
+        raise ValueError(f"Unknown C variant: {c_variant}")
+    radius_label = "radius4" if c_variant == "C1" else "radius4_8_16"
+    return {
+        "b_variant": b_variant,
+        "c_variant": c_variant,
+        "label": f"{b_variant}_C_{radius_label}",
+    }
+
+
 def canonical_candidate_indices(
     arrays: dict[str, np.ndarray],
     window_size: int,
@@ -238,6 +251,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-md", required=True)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--target-precision", type=float, default=0.80)
+    parser.add_argument("--calibration-precision", type=float, default=0.81)
+    parser.add_argument("--b-variant", choices=["B1", "B2", "B3"], default="B3")
+    parser.add_argument("--c-variant", choices=["C1", "C2"], default="C1")
     parser.add_argument("--window-size", type=int, default=256)
     parser.add_argument("--seed", type=int, default=41)
     return parser.parse_args()
@@ -266,9 +282,10 @@ def _write_markdown(path: Path, result: dict) -> None:
         "| System | Precision | Recall | F1 | Selected |",
         "| --- | ---: | ---: | ---: | ---: |",
     ]
-    baseline = result["matched_c1"]
+    baseline = result["matched_baseline"]
+    baseline_label = result["feature_spec"]["label"]
     lines.append(
-        f"| matched C1 | {baseline['test']['precision']:.4f} | "
+        f"| matched {baseline_label} | {baseline['test']['precision']:.4f} | "
         f"{baseline['test']['recall']:.4f} | {baseline['test']['f1']:.4f} | "
         f"{baseline['test']['selected']} |"
     )
@@ -291,6 +308,7 @@ def main() -> None:
     )
 
     args = parse_args()
+    feature_spec = global_feature_spec(args.b_variant, args.c_variant)
     cache_dir = Path(args.cache_dir)
     train, train_meta = _load_split(cache_dir, "train", args.window_size)
     calibration, calibration_meta = _load_split(
@@ -304,7 +322,8 @@ def main() -> None:
         train["b_ranking"],
         train["c_features"],
         train["c_ranking"],
-        "C1",
+        args.c_variant,
+        b_variant=args.b_variant,
     )
     calibration_x = build_c_variant_features(
         calibration["base_features"],
@@ -312,7 +331,8 @@ def main() -> None:
         calibration["b_ranking"],
         calibration["c_features"],
         calibration["c_ranking"],
-        "C1",
+        args.c_variant,
+        b_variant=args.b_variant,
     )
     test_x = build_c_variant_features(
         test["base_features"],
@@ -320,7 +340,8 @@ def main() -> None:
         test["b_ranking"],
         test["c_features"],
         test["c_ranking"],
-        "C1",
+        args.c_variant,
+        b_variant=args.b_variant,
     )
     model = make_small_leaf(args.seed)
     model.fit(train_x, train["labels"].astype(np.int64))
@@ -336,7 +357,7 @@ def main() -> None:
         calibration,
         calibration_scores,
         calibration_total,
-        args.target_precision + 0.01,
+        args.calibration_precision,
     )
     baseline_setting = {
         "score_floor": baseline_calibration["score_floor"],
@@ -345,7 +366,7 @@ def main() -> None:
         "conflict_distance": 0,
         "conflict_penalty": 0.0,
     }
-    matched_c1 = {
+    matched_baseline = {
         "calibration": baseline_calibration,
         "test": _evaluate_setting(
             test,
@@ -361,7 +382,7 @@ def main() -> None:
             calibration,
             calibration_scores,
             calibration_total,
-            args.target_precision,
+            args.calibration_precision,
             variant,
         )
         systems[variant] = {
@@ -376,10 +397,12 @@ def main() -> None:
     result = {
         "protocol": "piece_consistent_post_corruption_deduplicated_notes",
         "target_precision": args.target_precision,
+        "calibration_precision": args.calibration_precision,
+        "feature_spec": feature_spec,
         "train_candidates": len(train["labels"]),
         "calibration_candidates": len(calibration["labels"]),
         "test_candidates": len(test["labels"]),
-        "matched_c1": matched_c1,
+        "matched_baseline": matched_baseline,
         "systems": systems,
     }
     output_json = Path(args.output_json)

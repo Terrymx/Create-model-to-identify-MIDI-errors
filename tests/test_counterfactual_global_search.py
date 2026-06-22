@@ -7,6 +7,7 @@ import numpy as np
 from run_counterfactual_global_search import (
     _global_structures,
     _score_floor_grid,
+    global_feature_spec,
     canonical_candidate_indices,
     detection_metrics,
     select_global_predictions,
@@ -70,6 +71,16 @@ class CounterfactualGlobalSearchTests(unittest.TestCase):
         self.assertTrue(any(rate == 0.03 for _, rate, _, _ in structures))
         self.assertTrue(
             all(distance == 0 and penalty == 0.0 for _, _, distance, penalty in structures)
+        )
+
+    def test_global_feature_spec_uses_selected_b2_multiscale_c(self) -> None:
+        self.assertEqual(
+            global_feature_spec("B2", "C2"),
+            {
+                "b_variant": "B2",
+                "c_variant": "C2",
+                "label": "B2_C_radius4_8_16",
+            },
         )
 
 
