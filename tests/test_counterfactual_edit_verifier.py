@@ -70,6 +70,34 @@ class CounterfactualEditVerifierTests(unittest.TestCase):
         self.assertLess(c1.shape[1], c2.shape[1])
         self.assertGreater(c1.shape[1], base.shape[1])
 
+    def test_c_variant_can_extend_b2_instead_of_b3(self) -> None:
+        base = np.zeros((2, 5), dtype=np.float32)
+        b_features = np.zeros((2, 4, 17), dtype=np.float32)
+        b_ranking = np.zeros((2, 4), dtype=np.float32)
+        c_features = np.zeros((2, 2, 15), dtype=np.float32)
+        c_ranking = np.zeros((2, 2), dtype=np.float32)
+
+        b2_c1 = build_c_variant_features(
+            base,
+            b_features,
+            b_ranking,
+            c_features,
+            c_ranking,
+            "C1",
+            b_variant="B2",
+        )
+        b3_c1 = build_c_variant_features(
+            base,
+            b_features,
+            b_ranking,
+            c_features,
+            c_ranking,
+            "C1",
+            b_variant="B3",
+        )
+
+        self.assertLess(b2_c1.shape[1], b3_c1.shape[1])
+
 
 if __name__ == "__main__":
     unittest.main()

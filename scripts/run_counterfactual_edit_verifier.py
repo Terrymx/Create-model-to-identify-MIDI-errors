@@ -42,6 +42,7 @@ def build_c_variant_features(
     c_features: np.ndarray,
     c_ranking: np.ndarray,
     variant: str,
+    b_variant: str = "B3",
 ) -> np.ndarray:
     if variant == "C1":
         selected_c = c_features[:, :, :5]
@@ -49,9 +50,14 @@ def build_c_variant_features(
         selected_c = c_features[:, :, :15]
     else:
         raise ValueError(f"Unknown C variant: {variant}")
-    b3 = build_b_variant_features(base_features, b_features, b_ranking, "B3")
+    b_base = build_b_variant_features(
+        base_features,
+        b_features,
+        b_ranking,
+        b_variant,
+    )
     aggregated_c = aggregate_proposal_features(selected_c, c_ranking)
-    return np.concatenate([b3, aggregated_c], axis=1).astype(np.float32)
+    return np.concatenate([b_base, aggregated_c], axis=1).astype(np.float32)
 
 
 def correction_metrics(
