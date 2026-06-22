@@ -29,6 +29,15 @@ def top_proposal_indices(scores: np.ndarray, count: int = 2) -> np.ndarray:
     return np.argsort(-scores, axis=1, kind="mergesort")[:, :count]
 
 
+def normalize_radii(values: list[int] | tuple[int, ...]) -> tuple[int, ...]:
+    radii = tuple(int(value) for value in values)
+    if not radii or any(radius <= 0 for radius in radii):
+        raise ValueError("C radii must be positive.")
+    if tuple(sorted(set(radii))) != radii:
+        raise ValueError("C radii must be strictly increasing and unique.")
+    return radii
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache-dir", required=True)
@@ -44,6 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-test-files", type=int, default=None)
     parser.add_argument("--seed", type=int, default=41)
     parser.add_argument("--piece-consistent", action="store_true")
+    parser.add_argument("--radii", type=int, nargs="+", default=[4, 8, 16])
     return parser.parse_args()
 
 
@@ -104,6 +114,7 @@ def augment_split(
     backward_args,
     device: torch.device,
     batch_size: int,
+    radii: tuple[int, ...],
 ) -> None:
     arrays, metadata = load_candidate_cache(input_path)
     selected_slots = top_proposal_indices(arrays["b_ranking"], count=2)
@@ -167,7 +178,7 @@ def augment_split(
                 observed_log_probability(edited_backward, edited),
                 positions,
                 mask,
-                radii=(4, 8, 16),
+                radii=radii,
             ).cpu()
         )
     arrays["c_features"] = (
@@ -187,13 +198,14 @@ def augment_split(
         selected_slots,
         axis=1,
     )
-    metadata["c_radii"] = [4, 8, 16]
+    metadata["c_radii"] = list(radii)
     metadata["c_proposals_per_candidate"] = 2
     save_candidate_cache(output_path, arrays, metadata)
 
 
 def main() -> None:
     args = parse_args()
+    radii = normalize_radii(args.radii)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     forward_model, forward_args = load_any_model(args.forward_checkpoint, device)
     backward_model, backward_args = load_any_model(args.backward_checkpoint, device)
@@ -217,6 +229,7 @@ def main() -> None:
             backward_args,
             device,
             args.batch_size,
+            radii,
         )
 
 

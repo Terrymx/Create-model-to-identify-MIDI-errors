@@ -13,7 +13,7 @@ from build_counterfactual_candidate_cache import (
     load_candidate_cache,
     save_candidate_cache,
 )
-from build_counterfactual_local_cache import top_proposal_indices
+from build_counterfactual_local_cache import normalize_radii, top_proposal_indices
 
 
 class CounterfactualCandidateCacheTests(unittest.TestCase):
@@ -61,6 +61,11 @@ class CounterfactualCandidateCacheTests(unittest.TestCase):
         selected = top_proposal_indices(scores, count=2)
 
         np.testing.assert_array_equal(selected, [[1, 3], [0, 1]])
+
+    def test_local_cache_accepts_ordered_positive_radii(self) -> None:
+        self.assertEqual(normalize_radii([4, 8, 12]), (4, 8, 12))
+        with self.assertRaises(ValueError):
+            normalize_radii([4, 4, 12])
 
     def test_candidate_mask_uses_configured_union_thresholds(self) -> None:
         valid = torch.tensor([True, True, True, False])
