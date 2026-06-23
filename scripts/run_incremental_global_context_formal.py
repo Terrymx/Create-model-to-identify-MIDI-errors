@@ -6,6 +6,7 @@ import math
 import os
 import time
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 
@@ -59,6 +60,18 @@ def atomic_write_json(path: Path, value: dict) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
     temporary.replace(path)
+
+
+def run_piece_configurations(
+    *,
+    configs: list[dict],
+    make_scorer: Callable[[], object],
+    run_search: Callable[[object, dict], dict],
+) -> list[dict]:
+    if not configs:
+        return []
+    scorer = make_scorer()
+    return [run_search(scorer, config) for config in configs]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -253,6 +266,168 @@ def load_selected_calibration(progress_dir: Path) -> dict:
             f"selected calibration does not exist: {path}; run finalize first"
         )
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _prepare_piece_search(
+    *,
+    piece_id: int,
+    arrays: dict[str, np.ndarray],
+    dataset,
+    models: tuple,
+    verifier_model,
+):
+    import torch
+
+    from incremental_piece_scorer import IncrementalPieceScorer
+    from run_counterfactual_global_search import canonical_candidate_indices
+
+    full_rows = np.flatnonzero(arrays["file_ids"] == piece_id)
+    piece_arrays = {
+        name: values[full_rows]
+        for name, values in arrays.items()
+    }
+    piece_arrays["window_starts"] = (
+        piece_arrays["positions"] - piece_arrays["local_positions"]
+    ).astype(np.int64)
+    canonical_rows = canonical_candidate_indices(piece_arrays, 256)
+    canonical = {
+        name: values[canonical_rows]
+        for name, values in piece_arrays.items()
+    }
+    scorer = IncrementalPieceScorer(
+        piece_id=int(piece_id),
+        piece_features=dataset._pieces[int(piece_id)].features,
+        candidate_arrays=piece_arrays,
+        output_rows=canonical_rows,
+        models=models,
+        verifier_model=verifier_model,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    )
+    candidate_positions = canonical["positions"].astype(np.int64)
+    return {
+        "piece_id": int(piece_id),
+        "scorer": scorer,
+        "candidate_positions": candidate_positions,
+        "proposals": {
+            index: tuple(
+                int(value)
+                for value in canonical["c_proposals"][index, :2]
+            )
+            for index in range(len(candidate_positions))
+        },
+        "labels": canonical["labels"].astype(bool),
+        "note_count": int(dataset._note_counts[int(piece_id)]),
+        "errors": int(dataset._pieces[int(piece_id)].is_error.sum()),
+    }
+
+
+def _search_prepared_piece(
+    prepared: dict,
+    config: dict,
+    beam_width: int,
+) -> dict:
+    from run_incremental_global_context_d import incremental_beam_search
+
+    scorer = prepared["scorer"]
+    hits_before = scorer.window_cache.hits
+    misses_before = scorer.window_cache.misses
+    start = time.perf_counter()
+    state = incremental_beam_search(
+        candidate_positions=prepared["candidate_positions"],
+        proposals=prepared["proposals"],
+        score_all=scorer.score_all,
+        score_floor=float(config["score_floor"]),
+        beam_width=beam_width,
+        max_edits=max(
+            1,
+            int(math.ceil(prepared["note_count"] * config["edit_rate"])),
+        ),
+    )
+    elapsed = time.perf_counter() - start
+    selected_positions = {edit.position for edit in state.edits}
+    selected = np.asarray(
+        [
+            int(position) in selected_positions
+            for position in prepared["candidate_positions"]
+        ],
+        dtype=bool,
+    )
+    labels = prepared["labels"]
+    return {
+        "piece_id": prepared["piece_id"],
+        "tp": int((selected & labels).sum()),
+        "fp": int((selected & ~labels).sum()),
+        "errors": prepared["errors"],
+        "seconds": elapsed,
+        "window_hits": scorer.window_cache.hits - hits_before,
+        "window_misses": scorer.window_cache.misses - misses_before,
+        "edits": [
+            {
+                "position": edit.position,
+                "proposed_pitch": edit.proposed_pitch,
+            }
+            for edit in state.edits
+        ],
+    }
+
+
+def _run_piece_configs(
+    *,
+    piece_ids: list[int],
+    configs: list[dict],
+    arrays: dict[str, np.ndarray],
+    dataset,
+    models: tuple,
+    verifier_model,
+    beam_width: int,
+    progress_dir: Path,
+) -> None:
+    for piece_id in sorted(int(value) for value in piece_ids):
+        pending = [
+            config
+            for config in configs
+            if not _piece_result_path(
+                progress_dir, "calibration", config, piece_id
+            ).exists()
+        ]
+        if not pending:
+            continue
+        prepared = _prepare_piece_search(
+            piece_id=piece_id,
+            arrays=arrays,
+            dataset=dataset,
+            models=models,
+            verifier_model=verifier_model,
+        )
+
+        def run_search(scorer, config):
+            if scorer is not prepared["scorer"]:
+                raise RuntimeError("piece scorer identity changed")
+            row = _search_prepared_piece(prepared, config, beam_width)
+            atomic_write_json(
+                _piece_result_path(
+                    progress_dir, "calibration", config, piece_id
+                ),
+                row,
+            )
+            print(
+                json.dumps(
+                    {
+                        "split": "calibration",
+                        "config": _config_name(config),
+                        "piece": piece_id,
+                        "shared_score_states": len(scorer.score_cache),
+                    }
+                ),
+                flush=True,
+            )
+            return row
+
+        run_piece_configurations(
+            configs=pending,
+            make_scorer=lambda: prepared["scorer"],
+            run_search=run_search,
+        )
 
 
 def _run_config(
@@ -503,18 +678,16 @@ def main() -> None:
             calibration_piece_ids, args.worker_index, args.worker_count
         )
         models = _load_models(args, device)
-        for config in configs:
-            _run_config(
-                split="calibration",
-                arrays=calibration_arrays,
-                dataset=calibration_dataset,
-                models=models,
-                verifier_model=verifier_model,
-                config=config,
-                beam_width=args.beam_width,
-                progress_dir=progress_dir,
-                piece_ids=assigned,
-            )
+        _run_piece_configs(
+            piece_ids=assigned,
+            configs=configs,
+            arrays=calibration_arrays,
+            dataset=calibration_dataset,
+            models=models,
+            verifier_model=verifier_model,
+            beam_width=args.beam_width,
+            progress_dir=progress_dir,
+        )
         return
 
     calibration_rows, selected = finalize_calibration_grid(

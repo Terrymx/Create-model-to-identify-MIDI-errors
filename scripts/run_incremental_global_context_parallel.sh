@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKERS="${WORKERS:-4}"
+WORKERS="${WORKERS:-1}"
 PYTHON_BIN="${PYTHON_BIN:-/home/wwh/anaconda3/envs/midi-error-detector/bin/python}"
 DATA_ROOT="${DATA_ROOT:-/media/wwh/7382E9627565AA99/maestro-v3.0.0-midi/maestro-v3.0.0}"
 PROGRESS_DIR="${PROGRESS_DIR:-training_logs/incremental_global_context_progress}"

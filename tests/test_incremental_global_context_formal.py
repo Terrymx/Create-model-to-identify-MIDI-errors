@@ -12,6 +12,7 @@ from run_incremental_global_context_formal import (
     load_selected_calibration,
     parse_args,
     partition_piece_ids,
+    run_piece_configurations,
     select_calibration_config,
 )
 
@@ -222,6 +223,33 @@ class IncrementalGlobalContextFormalTests(unittest.TestCase):
                     expected_piece_ids=[1],
                     required_precision=0.8,
                 )
+
+    def test_run_piece_configurations_reuses_one_scorer(self) -> None:
+        configs = [
+            {"score_floor": 0.5, "edit_rate": 0.01},
+            {"score_floor": 0.6, "edit_rate": 0.015},
+        ]
+        scorer_creations = []
+        searches = []
+
+        def make_scorer():
+            scorer = object()
+            scorer_creations.append(scorer)
+            return scorer
+
+        def run_search(scorer, config):
+            searches.append((scorer, config))
+            return {"config": config}
+
+        results = run_piece_configurations(
+            configs=configs,
+            make_scorer=make_scorer,
+            run_search=run_search,
+        )
+
+        self.assertEqual(len(scorer_creations), 1)
+        self.assertEqual([row["config"] for row in results], configs)
+        self.assertIs(searches[0][0], searches[1][0])
 
     def test_selects_highest_recall_at_required_precision(self) -> None:
         rows = [
