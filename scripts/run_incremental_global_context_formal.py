@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -37,7 +38,30 @@ def metric_row(tp: int, fp: int, total_errors: int) -> dict:
     }
 
 
-def parse_args() -> argparse.Namespace:
+def partition_piece_ids(
+    piece_ids: list[int],
+    worker_index: int,
+    worker_count: int,
+) -> list[int]:
+    if worker_count <= 0:
+        raise ValueError("worker_count must be positive")
+    if worker_index < 0 or worker_index >= worker_count:
+        raise ValueError(
+            f"worker_index must be in [0, {worker_count}), got {worker_index}"
+        )
+    return sorted(int(piece_id) for piece_id in piece_ids)[
+        worker_index::worker_count
+    ]
+
+
+def atomic_write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache-dir", required=True)
     parser.add_argument("--data-root", required=True)
@@ -51,7 +75,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=41)
     parser.add_argument("--beam-width", type=int, default=4)
     parser.add_argument("--calibration-precision", type=float, default=0.81)
-    return parser.parse_args()
+    parser.add_argument(
+        "--phase",
+        required=True,
+        choices=("calibration", "test", "finalize"),
+    )
+    parser.add_argument("--worker-index", type=int, default=0)
+    parser.add_argument("--worker-count", type=int, default=1)
+    args = parser.parse_args(argv)
+    partition_piece_ids([], args.worker_index, args.worker_count)
+    return args
 
 
 def _load_raw_split(cache_dir: Path, split: str) -> dict[str, np.ndarray]:
@@ -138,6 +171,90 @@ def _piece_result_path(
     return progress_dir / split / _config_name(config) / f"{piece_id}.json"
 
 
+def aggregate_config_checkpoints(
+    *,
+    progress_dir: Path,
+    split: str,
+    config: dict,
+    expected_piece_ids: list[int],
+) -> dict:
+    totals = {
+        "tp": 0,
+        "fp": 0,
+        "errors": 0,
+        "seconds": 0.0,
+        "window_hits": 0,
+        "window_misses": 0,
+        "pieces": 0,
+    }
+    missing = []
+    for piece_id in sorted(int(value) for value in expected_piece_ids):
+        result_path = _piece_result_path(
+            progress_dir, split, config, piece_id
+        )
+        if not result_path.exists():
+            missing.append(piece_id)
+            continue
+        row = json.loads(result_path.read_text(encoding="utf-8"))
+        totals["tp"] += int(row["tp"])
+        totals["fp"] += int(row["fp"])
+        totals["errors"] += int(row["errors"])
+        totals["seconds"] += float(row["seconds"])
+        totals["window_hits"] += int(row["window_hits"])
+        totals["window_misses"] += int(row["window_misses"])
+        totals["pieces"] += 1
+    if missing:
+        raise RuntimeError(
+            f"missing {len(missing)} {split} checkpoints for "
+            f"{_config_name(config)}: {missing[:10]}"
+        )
+    metrics = metric_row(totals["tp"], totals["fp"], totals["errors"])
+    metrics.update(
+        {
+            "config": config,
+            "seconds": totals["seconds"],
+            "pieces": totals["pieces"],
+            "window_hits": totals["window_hits"],
+            "window_misses": totals["window_misses"],
+        }
+    )
+    return metrics
+
+
+def _selected_calibration_path(progress_dir: Path) -> Path:
+    return progress_dir / "selected_calibration.json"
+
+
+def finalize_calibration_grid(
+    *,
+    progress_dir: Path,
+    configs: list[dict],
+    expected_piece_ids: list[int],
+    required_precision: float,
+) -> tuple[list[dict], dict]:
+    rows = [
+        aggregate_config_checkpoints(
+            progress_dir=progress_dir,
+            split="calibration",
+            config=config,
+            expected_piece_ids=expected_piece_ids,
+        )
+        for config in configs
+    ]
+    selected = select_calibration_config(rows, required_precision)
+    atomic_write_json(_selected_calibration_path(progress_dir), selected)
+    return rows, selected
+
+
+def load_selected_calibration(progress_dir: Path) -> dict:
+    path = _selected_calibration_path(progress_dir)
+    if not path.exists():
+        raise RuntimeError(
+            f"selected calibration does not exist: {path}; run finalize first"
+        )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def _run_config(
     *,
     split: str,
@@ -148,6 +265,7 @@ def _run_config(
     config: dict,
     beam_width: int,
     progress_dir: Path,
+    piece_ids: list[int] | None = None,
 ) -> dict:
     import torch
 
@@ -164,7 +282,12 @@ def _run_config(
         "window_misses": 0,
         "pieces": 0,
     }
-    for piece_id in sorted(np.unique(arrays["file_ids"]).tolist()):
+    selected_piece_ids = (
+        sorted(np.unique(arrays["file_ids"]).tolist())
+        if piece_ids is None
+        else sorted(int(piece_id) for piece_id in piece_ids)
+    )
+    for piece_id in selected_piece_ids:
         result_path = _piece_result_path(
             progress_dir, split, config, int(piece_id)
         )
@@ -243,8 +366,7 @@ def _run_config(
                     for edit in state.edits
                 ],
             }
-            result_path.parent.mkdir(parents=True, exist_ok=True)
-            result_path.write_text(json.dumps(row, indent=2), encoding="utf-8")
+            atomic_write_json(result_path, row)
         totals["tp"] += row["tp"]
         totals["fp"] += row["fp"]
         totals["errors"] += row["errors"]
@@ -276,28 +398,35 @@ def _run_config(
     return metrics
 
 
-def main() -> None:
-    import torch
-    from joblib import load
+def _calibration_configs(baseline_floor: float) -> list[dict]:
+    floors = [
+        max(0.0, baseline_floor + offset)
+        for offset in (-0.06, -0.03, 0.0, 0.03)
+    ]
+    return [
+        {"score_floor": floor, "edit_rate": rate}
+        for floor in floors
+        for rate in (0.0100, 0.0125, 0.0150)
+    ]
 
+
+def _load_models(args: argparse.Namespace, device) -> tuple:
     from run_frozen_union_candidate_context_verifier import load_any_model
-    from voice_aware_dataset import PieceConsistentVoiceDataset
 
-    args = parse_args()
-    cache_dir = Path(args.cache_dir)
-    progress_dir = Path(args.progress_dir)
-    verifier_model = load(args.verifier_checkpoint)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    models = (
+    return (
         *load_any_model(args.threeclass_checkpoint, device),
         *load_any_model(args.binary_checkpoint, device),
         *load_any_model(args.forward_checkpoint, device),
         *load_any_model(args.backward_checkpoint, device),
     )
-    calibration_arrays = _load_raw_split(cache_dir, "calibration")
-    calibration_dataset = PieceConsistentVoiceDataset(
+
+
+def _load_dataset(args: argparse.Namespace, split: str):
+    from voice_aware_dataset import PieceConsistentVoiceDataset
+
+    return PieceConsistentVoiceDataset(
         root=args.data_root,
-        split="validation",
+        split="validation" if split == "calibration" else "test",
         voice_method="onset_matching",
         window_size=256,
         stride=128,
@@ -305,11 +434,61 @@ def main() -> None:
         seed=args.seed,
         verbose=True,
     )
-    calibration_total = int(
+
+
+def _split_total_errors(
+    arrays: dict[str, np.ndarray],
+    dataset,
+) -> int:
+    return int(
         sum(
-            calibration_dataset._pieces[int(piece_id)].is_error.sum()
-            for piece_id in np.unique(calibration_arrays["file_ids"])
+            dataset._pieces[int(piece_id)].is_error.sum()
+            for piece_id in np.unique(arrays["file_ids"])
         )
+    )
+
+
+def main() -> None:
+    import torch
+    from joblib import load
+
+    args = parse_args()
+    cache_dir = Path(args.cache_dir)
+    progress_dir = Path(args.progress_dir)
+    verifier_model = load(args.verifier_checkpoint)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if args.phase == "test":
+        selected = load_selected_calibration(progress_dir)
+        test_arrays = _load_raw_split(cache_dir, "test")
+        test_piece_ids = sorted(
+            int(piece_id)
+            for piece_id in np.unique(test_arrays["file_ids"]).tolist()
+        )
+        assigned = partition_piece_ids(
+            test_piece_ids, args.worker_index, args.worker_count
+        )
+        _run_config(
+            split="test",
+            arrays=test_arrays,
+            dataset=_load_dataset(args, "test"),
+            models=_load_models(args, device),
+            verifier_model=verifier_model,
+            config=selected["config"],
+            beam_width=args.beam_width,
+            progress_dir=progress_dir,
+            piece_ids=assigned,
+        )
+        return
+
+    calibration_arrays = _load_raw_split(cache_dir, "calibration")
+    calibration_dataset = _load_dataset(args, "calibration")
+    calibration_piece_ids = sorted(
+        int(piece_id)
+        for piece_id in np.unique(calibration_arrays["file_ids"]).tolist()
+    )
+    calibration_total = _split_total_errors(
+        calibration_arrays, calibration_dataset
     )
     baseline_calibration, baseline_floor = _baseline(
         calibration_arrays,
@@ -317,61 +496,66 @@ def main() -> None:
         calibration_total,
         args.calibration_precision,
     )
-    floors = [
-        max(0.0, baseline_floor + offset)
-        for offset in (-0.06, -0.03, 0.0, 0.03)
-    ]
-    configs = [
-        {"score_floor": floor, "edit_rate": rate}
-        for floor in floors
-        for rate in (0.0100, 0.0125, 0.0150)
-    ]
-    calibration_rows = [
-        _run_config(
-            split="calibration",
-            arrays=calibration_arrays,
-            dataset=calibration_dataset,
-            models=models,
-            verifier_model=verifier_model,
-            config=config,
-            beam_width=args.beam_width,
-            progress_dir=progress_dir,
+    configs = _calibration_configs(baseline_floor)
+
+    if args.phase == "calibration":
+        assigned = partition_piece_ids(
+            calibration_piece_ids, args.worker_index, args.worker_count
         )
-        for config in configs
-    ]
-    selected = select_calibration_config(
-        calibration_rows,
-        args.calibration_precision,
+        models = _load_models(args, device)
+        for config in configs:
+            _run_config(
+                split="calibration",
+                arrays=calibration_arrays,
+                dataset=calibration_dataset,
+                models=models,
+                verifier_model=verifier_model,
+                config=config,
+                beam_width=args.beam_width,
+                progress_dir=progress_dir,
+                piece_ids=assigned,
+            )
+        return
+
+    calibration_rows, selected = finalize_calibration_grid(
+        progress_dir=progress_dir,
+        configs=configs,
+        expected_piece_ids=calibration_piece_ids,
+        required_precision=args.calibration_precision,
     )
     test_arrays = _load_raw_split(cache_dir, "test")
-    test_dataset = PieceConsistentVoiceDataset(
-        root=args.data_root,
-        split="test",
-        voice_method="onset_matching",
-        window_size=256,
-        stride=128,
-        error_rate=0.01,
-        seed=args.seed,
-        verbose=True,
+    test_piece_ids = sorted(
+        int(piece_id)
+        for piece_id in np.unique(test_arrays["file_ids"]).tolist()
     )
-    test_total = int(
-        sum(piece.is_error.sum() for piece in test_dataset._pieces)
-    )
+    try:
+        test_row = aggregate_config_checkpoints(
+            progress_dir=progress_dir,
+            split="test",
+            config=selected["config"],
+            expected_piece_ids=test_piece_ids,
+        )
+    except RuntimeError as error:
+        print(
+            json.dumps(
+                {
+                    "status": "calibration_selected",
+                    "selected_calibration": selected,
+                    "test": str(error),
+                },
+                indent=2,
+            ),
+            flush=True,
+        )
+        return
+
+    test_dataset = _load_dataset(args, "test")
+    test_total = _split_total_errors(test_arrays, test_dataset)
     baseline_test = _baseline_at_threshold(
         test_arrays,
         verifier_model,
         test_total,
         baseline_floor,
-    )
-    test_row = _run_config(
-        split="test",
-        arrays=test_arrays,
-        dataset=test_dataset,
-        models=models,
-        verifier_model=verifier_model,
-        config=selected["config"],
-        beam_width=args.beam_width,
-        progress_dir=progress_dir,
     )
     result = {
         "protocol": "genuine_incremental_global_context",
@@ -384,8 +568,7 @@ def main() -> None:
         "selected_test": test_row,
     }
     output = Path(args.output_json)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    atomic_write_json(output, result)
     print(json.dumps(result, indent=2), flush=True)
 
 
