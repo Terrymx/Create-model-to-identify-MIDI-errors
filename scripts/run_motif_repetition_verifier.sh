@@ -14,9 +14,9 @@ echo "[$(date --iso-8601=seconds)] evaluating motif/repetition verifier"
 "$python" -u scripts/run_motif_repetition_verifier.py \
   --cache-dir "$cache_dir" \
   --data-root "$data_root" \
-  --output-json training_logs/motif_repetition_verifier.json \
-  --output-md training_logs/motif_repetition_verifier.md \
-  --checkpoint-dir checkpoints/motif_repetition_verifier \
+  --output-json training_logs/motif_repetition_fdr_verifier.json \
+  --output-md training_logs/motif_repetition_fdr_verifier.md \
+  --checkpoint-dir checkpoints/motif_repetition_fdr_verifier \
   --target-precision 0.80 \
   --seed 41 \
   --motif-radius 4 \

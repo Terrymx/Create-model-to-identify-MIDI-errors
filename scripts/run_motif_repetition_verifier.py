@@ -18,6 +18,7 @@ from run_counterfactual_edit_verifier import (
     evaluate_score_rows,
     make_small_leaf,
 )
+from risk_control_selection import evaluate_fdr_score_rows
 from voice_aware_dataset import PieceConsistentVoiceDataset
 
 
@@ -124,6 +125,57 @@ def motif_summary(arrays: dict[str, np.ndarray]) -> dict:
     }
 
 
+def train_and_predict(
+    name: str,
+    train_x: np.ndarray,
+    calibration_x: np.ndarray,
+    test_x: np.ndarray,
+    train: dict[str, np.ndarray],
+    seed: int,
+    checkpoint_dir: Path,
+) -> tuple[np.ndarray, np.ndarray]:
+    model = make_small_leaf(seed)
+    model.fit(train_x, train["labels"].astype(np.int64))
+    dump(model, checkpoint_dir / f"{name.lower()}_small_leaf.joblib")
+    return (
+        model.predict_proba(calibration_x)[:, 1],
+        model.predict_proba(test_x)[:, 1],
+    )
+
+
+def add_threshold_and_fdr_systems(
+    systems: dict,
+    name: str,
+    calibration_scores: np.ndarray,
+    test_scores: np.ndarray,
+    calibration: dict[str, np.ndarray],
+    test: dict[str, np.ndarray],
+    calibration_total: int,
+    test_total: int,
+    target_precision: float,
+) -> None:
+    systems[name] = evaluate_score_rows(
+        calibration_scores,
+        test_scores,
+        calibration,
+        test,
+        calibration_total,
+        test_total,
+        target_precision,
+    )
+    systems[f"{name}_fdr"] = evaluate_fdr_score_rows(
+        calibration_scores,
+        test_scores,
+        calibration["labels"].astype(np.int64),
+        test["labels"].astype(np.int64),
+        calibration["file_ids"].astype(np.int64),
+        test["file_ids"].astype(np.int64),
+        calibration_total,
+        test_total,
+        target_precision,
+    )
+
+
 def train_and_evaluate(
     name: str,
     train_x: np.ndarray,
@@ -138,12 +190,18 @@ def train_and_evaluate(
     seed: int,
     checkpoint_dir: Path,
 ) -> dict:
-    model = make_small_leaf(seed)
-    model.fit(train_x, train["labels"].astype(np.int64))
-    dump(model, checkpoint_dir / f"{name.lower()}_small_leaf.joblib")
+    calibration_scores, test_scores = train_and_predict(
+        name,
+        train_x,
+        calibration_x,
+        test_x,
+        train,
+        seed,
+        checkpoint_dir,
+    )
     return evaluate_score_rows(
-        model.predict_proba(calibration_x)[:, 1],
-        model.predict_proba(test_x)[:, 1],
+        calibration_scores,
+        test_scores,
         calibration,
         test,
         calibration_total,
@@ -214,36 +272,48 @@ def main() -> None:
     test_total = int(test_meta["stats"]["error_notes"])
 
     systems = {}
-    systems["B2"] = train_and_evaluate(
+    calibration_scores, test_scores = train_and_predict(
         "B2",
         build_b_variant_features(train["base_features"], train["b_features"], train["b_ranking"], "B2"),
         build_b_variant_features(calibration["base_features"], calibration["b_features"], calibration["b_ranking"], "B2"),
         build_b_variant_features(test["base_features"], test["b_features"], test["b_ranking"], "B2"),
         train,
+        args.seed,
+        checkpoint_dir,
+    )
+    add_threshold_and_fdr_systems(
+        systems,
+        "B2",
+        calibration_scores,
+        test_scores,
         calibration,
         test,
         calibration_total,
         test_total,
         args.target_precision,
-        args.seed,
-        checkpoint_dir,
     )
-    systems["B2_motif"] = train_and_evaluate(
+    calibration_scores, test_scores = train_and_predict(
         "B2_motif",
         build_b2_motif_features(train),
         build_b2_motif_features(calibration),
         build_b2_motif_features(test),
         train,
+        args.seed + 1,
+        checkpoint_dir,
+    )
+    add_threshold_and_fdr_systems(
+        systems,
+        "B2_motif",
+        calibration_scores,
+        test_scores,
         calibration,
         test,
         calibration_total,
         test_total,
         args.target_precision,
-        args.seed + 1,
-        checkpoint_dir,
     )
     if "c_features" in train:
-        systems["C2"] = train_and_evaluate(
+        calibration_scores, test_scores = train_and_predict(
             "C2",
             build_c_variant_features(
                 train["base_features"],
@@ -270,27 +340,39 @@ def main() -> None:
                 "C2",
             ),
             train,
+            args.seed + 2,
+            checkpoint_dir,
+        )
+        add_threshold_and_fdr_systems(
+            systems,
+            "C2",
+            calibration_scores,
+            test_scores,
             calibration,
             test,
             calibration_total,
             test_total,
             args.target_precision,
-            args.seed + 2,
-            checkpoint_dir,
         )
-        systems["C2_motif"] = train_and_evaluate(
+        calibration_scores, test_scores = train_and_predict(
             "C2_motif",
             build_c2_motif_features(train),
             build_c2_motif_features(calibration),
             build_c2_motif_features(test),
             train,
+            args.seed + 3,
+            checkpoint_dir,
+        )
+        add_threshold_and_fdr_systems(
+            systems,
+            "C2_motif",
+            calibration_scores,
+            test_scores,
             calibration,
             test,
             calibration_total,
             test_total,
             args.target_precision,
-            args.seed + 3,
-            checkpoint_dir,
         )
     result = {
         "target_precision": args.target_precision,
