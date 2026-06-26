@@ -2017,3 +2017,48 @@ score floor `0.663694`, and per-piece edit budget `1.25%`, producing:
 D1 increased precision but lost `0.42` recall points and `0.17` F1 points, so
 it is rejected. The current frontier under the unified piece-consistent,
 unique-note protocol remains B2+C(4/8/16).
+
+## 2026-06-26 - Genuine Whole-Piece D and Motif Evidence
+
+The later genuine global-context D run re-scored full pieces after sequential
+edits instead of only applying a cheap local budget proxy. It did not improve
+the frontier:
+
+- baseline matched B2+C: `P=0.8073`, `R=0.5892`;
+- selected D: `P=0.8056`, `R=0.5667`.
+
+This rejects the current D implementation as a recall improver. The useful
+interpretation is that whole-piece sequential selection is not yet adding new
+discriminative evidence; it mostly changes output policy.
+
+A new motif/repetition evidence layer was then added on top of the existing
+B2+C cache. It searches same-piece transposition-invariant repeated contexts
+around each candidate and measures whether B's proposed pitch is more
+consistent with repeated material than the observed pitch. This adds genuinely
+non-local musical evidence without retraining the neural teachers.
+
+Focused test results:
+
+- B2: `P=0.8057`, `R=0.5761`, `F1=0.6718`;
+- B2+motif: `P=0.8058`, `R=0.5973`, `F1=0.6861`;
+- C2: `P=0.8092`, `R=0.5849`, `F1=0.6790`;
+- C2+motif: `P=0.8015`, `R=0.6122`, `F1=0.6942`.
+
+Thus motif/repetition evidence is accepted as the current best system under
+the unified piece-consistent protocol. It improves recall by `+2.30` points
+over matched C2 and by `+1.20` points over the previous `R>0.60` target while
+retaining precision above `0.80`.
+
+An FDR/risk-control selector was tested on the same motif scores. It improved
+some operating-point precision but reduced recall:
+
+- C2+motif threshold selection: `P=0.8015`, `R=0.6122`;
+- C2+motif FDR selection: `P=0.8267`, `R=0.5771`.
+
+FDR is therefore useful as a high-precision deployment option, but rejected as
+the main objective when optimizing recall subject to `P>=0.80`.
+
+The next minimal experiment is a focused motif parameter sweep around the
+winning setting `(radius=4, min_similarity=0.84, exclude_radius=16)`. The goal
+is to test whether repeated-structure evidence can be tuned past the current
+frontier without changing the teacher models or rebuilding B/C caches.

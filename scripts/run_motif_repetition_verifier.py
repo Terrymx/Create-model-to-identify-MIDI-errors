@@ -217,6 +217,7 @@ def write_markdown(path: Path, result: dict) -> None:
         f"- target precision: `{result['target_precision']:.2f}`",
         f"- motif radius: `{result['motif']['radius']}`",
         f"- motif min similarity: `{result['motif']['min_similarity']}`",
+        f"- motif exclude radius: `{result['motif']['exclude_radius']}`",
         "",
         "| System | Precision | Recall | F1 |",
         "| --- | ---: | ---: | ---: |",
