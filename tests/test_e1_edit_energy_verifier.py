@@ -57,6 +57,22 @@ class E1EditEnergyVerifierTest(unittest.TestCase):
         self.assertAlmostEqual(float(tensors.proposal[0, 1, -2]), 64 / 127.0)
         self.assertAlmostEqual(float(tensors.proposal[0, 1, -1]), 4 / 24.0)
 
+    def test_build_e1_feature_tensors_pads_shorter_c_proposal_features(self) -> None:
+        arrays = {
+            "observed_pitch": np.asarray([60], dtype=np.float32),
+            "proposals": np.asarray([[62, 64, 65, 67]], dtype=np.float32),
+            "b_features": np.ones((1, 4, 17), dtype=np.float32),
+            "b_ranking": np.asarray([[0.1, 0.4, 0.2, 0.3]], dtype=np.float32),
+            "c_features": np.ones((1, 2, 15), dtype=np.float32) * 2,
+            "c_ranking": np.asarray([[0.0, 0.5]], dtype=np.float32),
+        }
+
+        tensors = build_e1_feature_tensors(arrays, np.zeros((1, 6), dtype=np.float32))
+
+        self.assertEqual(tensors.proposal.shape[0:2], (1, 4))
+        self.assertTrue(np.all(tensors.proposal[0, 0, 17:32] == 2.0))
+        self.assertTrue(np.all(tensors.proposal[0, 2, 17:32] == 0.0))
+
     def test_model_forward_returns_candidate_and_proposal_logits(self) -> None:
         model = E1EditEnergyNet(candidate_dim=6, proposal_dim=10, hidden_dim=8)
         candidate = torch.zeros((3, 6), dtype=torch.float32)

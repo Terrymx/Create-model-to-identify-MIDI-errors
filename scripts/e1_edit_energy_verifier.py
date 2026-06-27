@@ -129,18 +129,32 @@ def build_e1_feature_tensors(
     arrays: dict[str, np.ndarray],
     candidate_features: np.ndarray,
 ) -> E1FeatureTensors:
+    def align_proposal_axis(values: np.ndarray, proposal_count: int) -> np.ndarray:
+        if values.shape[1] == proposal_count:
+            return values.astype(np.float32)
+        aligned = np.zeros(
+            (values.shape[0], proposal_count, values.shape[2]),
+            dtype=np.float32,
+        )
+        shared = min(proposal_count, values.shape[1])
+        aligned[:, :shared, :] = values[:, :shared, :].astype(np.float32)
+        return aligned
+
     observed = arrays["observed_pitch"].astype(np.float32)[:, None, None]
     proposals = arrays["proposals"].astype(np.float32)[:, :, None]
+    proposal_count = proposals.shape[1]
     b_features = arrays["b_features"].astype(np.float32)
-    c_features = arrays.get(
+    raw_c_features = arrays.get(
         "c_features",
-        np.zeros((*b_features.shape[:2], 0), dtype=np.float32),
+        np.zeros((len(b_features), proposal_count, 0), dtype=np.float32),
     ).astype(np.float32)
+    c_features = align_proposal_axis(raw_c_features, proposal_count)
     b_ranking = arrays["b_ranking"].astype(np.float32)[:, :, None]
-    c_ranking = arrays.get(
+    raw_c_ranking = arrays.get(
         "c_ranking",
-        np.zeros_like(arrays["b_ranking"], dtype=np.float32),
+        np.zeros((len(b_features), proposal_count), dtype=np.float32),
     ).astype(np.float32)[:, :, None]
+    c_ranking = align_proposal_axis(raw_c_ranking, proposal_count)
     proposal_features = np.concatenate(
         [
             b_features,
