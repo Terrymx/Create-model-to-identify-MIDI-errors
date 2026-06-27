@@ -280,6 +280,90 @@ def predict_e1(
     )
 
 
+def row_at_threshold_local(
+    scores: np.ndarray,
+    labels: np.ndarray,
+    total_errors: int,
+    threshold: float,
+) -> dict:
+    prediction = scores >= threshold
+    target = labels.astype(bool)
+    tp = int(np.logical_and(prediction, target).sum())
+    fp = int(np.logical_and(prediction, ~target).sum())
+    fn = int(total_errors - tp)
+    precision = tp / max(tp + fp, 1)
+    recall = tp / max(total_errors, 1)
+    f1 = 2.0 * precision * recall / max(precision + recall, 1e-12)
+    return {
+        "threshold": float(threshold),
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+    }
+
+
+def threshold_grid_local(scores: np.ndarray) -> np.ndarray:
+    quantiles = np.quantile(scores, np.linspace(0.01, 0.995, 180))
+    fixed = np.linspace(float(scores.min()), float(scores.max()), 120)
+    return np.unique(np.concatenate([quantiles, fixed])).astype(np.float32)
+
+
+def select_from_calibration_local(
+    calibration_scores: np.ndarray,
+    calibration_labels: np.ndarray,
+    calibration_total_errors: int,
+    target_precision: float,
+) -> dict:
+    rows = [
+        row_at_threshold_local(
+            calibration_scores,
+            calibration_labels,
+            calibration_total_errors,
+            threshold,
+        )
+        for threshold in threshold_grid_local(calibration_scores)
+    ]
+    feasible = [row for row in rows if row["precision"] >= target_precision]
+    if feasible:
+        return max(feasible, key=lambda row: (row["recall"], row["precision"]))
+    return max(rows, key=lambda row: (row["precision"], row["recall"]))
+
+
+def correction_metrics_local(
+    proposals: np.ndarray,
+    proposal_scores: np.ndarray,
+    detected: np.ndarray,
+    labels: np.ndarray,
+    error_kinds: np.ndarray,
+    target_pitch: np.ndarray,
+) -> dict:
+    replace = detected & labels.astype(bool) & (error_kinds == 1)
+    count = int(replace.sum())
+    if count == 0:
+        return {
+            "detected_replace_errors": 0,
+            "top1_correct": 0,
+            "top3_correct": 0,
+            "top1_accuracy": 0.0,
+            "top3_accuracy": 0.0,
+        }
+    order = np.argsort(-proposal_scores[replace], axis=1, kind="mergesort")
+    ranked = np.take_along_axis(proposals[replace], order, axis=1)
+    targets = target_pitch[replace]
+    top1 = int((ranked[:, 0] == targets).sum())
+    top3 = int((ranked[:, :3] == targets[:, None]).any(axis=1).sum())
+    return {
+        "detected_replace_errors": count,
+        "top1_correct": top1,
+        "top3_correct": top3,
+        "top1_accuracy": top1 / count,
+        "top3_accuracy": top3 / count,
+    }
+
+
 def evaluate_e1_score_rows(
     calibration_scores: np.ndarray,
     test_scores: np.ndarray,
@@ -290,24 +374,21 @@ def evaluate_e1_score_rows(
     test_total_errors: int,
     target_precision: float,
 ) -> dict:
-    from calibrate_frozen_context_verifier import row_at_threshold, select_from_calibration
-    from run_counterfactual_edit_verifier import correction_metrics
-
     rows = []
     for margin in [0.00, 0.01, 0.02, 0.03, 0.04, 0.05]:
-        selected = select_from_calibration(
+        selected = select_from_calibration_local(
             calibration_scores,
             calibration["labels"].astype(np.int64),
             calibration_total_errors,
             target_precision + margin,
         )
-        test_row = row_at_threshold(
+        test_row = row_at_threshold_local(
             test_scores,
             test["labels"].astype(np.int64),
             test_total_errors,
             selected["threshold"],
         )
-        test_row["correction"] = correction_metrics(
+        test_row["correction"] = correction_metrics_local(
             test["proposals"],
             test_proposal_scores,
             test_scores >= selected["threshold"],
@@ -421,6 +502,93 @@ def _fusion_features(candidate_features: np.ndarray, logits: np.ndarray, scores:
     ).astype(np.float32)
 
 
+def build_proposal_selected_features(
+    candidate_features: np.ndarray,
+    proposal_features: np.ndarray,
+    proposal_logits: np.ndarray,
+) -> np.ndarray:
+    if proposal_features.ndim != 3:
+        raise ValueError("proposal_features must have shape [rows, proposals, features].")
+    if proposal_logits.shape != proposal_features.shape[:2]:
+        raise ValueError("proposal_logits must align with proposal rows.")
+    best_index = proposal_logits.argmax(axis=1)
+    best_proposal = proposal_features[np.arange(len(proposal_features)), best_index]
+    sorted_scores = np.sort(proposal_logits, axis=1)
+    best_score = sorted_scores[:, -1]
+    second_score = sorted_scores[:, -2] if proposal_logits.shape[1] > 1 else np.zeros_like(best_score)
+    score_gap = best_score - second_score
+    shifted = proposal_logits - proposal_logits.max(axis=1, keepdims=True)
+    probability = np.exp(shifted)
+    probability = probability / probability.sum(axis=1, keepdims=True).clip(min=1e-9)
+    entropy = -(probability * np.log(probability.clip(min=1e-9))).sum(axis=1)
+    return np.concatenate(
+        [
+            candidate_features.astype(np.float32),
+            best_proposal.astype(np.float32),
+            best_score[:, None].astype(np.float32),
+            score_gap[:, None].astype(np.float32),
+            entropy[:, None].astype(np.float32),
+        ],
+        axis=1,
+    ).astype(np.float32)
+
+
+def evaluate_detection_with_external_correction(
+    calibration_scores: np.ndarray,
+    test_scores: np.ndarray,
+    external_test_proposal_scores: np.ndarray,
+    calibration: dict[str, np.ndarray],
+    test: dict[str, np.ndarray],
+    calibration_total_errors: int,
+    test_total_errors: int,
+    target_precision: float,
+) -> dict:
+    rows = []
+    for margin in [0.00, 0.01, 0.02, 0.03, 0.04, 0.05]:
+        selected = select_from_calibration_local(
+            calibration_scores,
+            calibration["labels"].astype(np.int64),
+            calibration_total_errors,
+            target_precision + margin,
+        )
+        test_row = row_at_threshold_local(
+            test_scores,
+            test["labels"].astype(np.int64),
+            test_total_errors,
+            selected["threshold"],
+        )
+        test_row["correction"] = correction_metrics_local(
+            test["proposals"],
+            external_test_proposal_scores,
+            test_scores >= selected["threshold"],
+            test["labels"],
+            test["error_kind"],
+            test["target_pitch"],
+        )
+        rows.append(
+            {
+                "requested_precision": target_precision + margin,
+                "selected_calibration": selected,
+                "selected_test": test_row,
+            }
+        )
+    feasible = [
+        row for row in rows if row["selected_test"]["precision"] >= target_precision
+    ]
+    return {
+        "margins": rows,
+        "best_feasible_test": max(
+            feasible or rows,
+            key=lambda row: (
+                row["selected_test"]["recall"]
+                if row["selected_test"]["precision"] >= target_precision
+                else -1.0,
+                row["selected_test"]["precision"],
+            ),
+        ),
+    }
+
+
 def write_markdown(path: Path, result: dict) -> None:
     lines = [
         "# E1 Edit-Energy Verifier",
@@ -472,9 +640,11 @@ def main() -> None:
     baseline = make_small_leaf(args.seed)
     baseline.fit(train_x, train["labels"].astype(np.int64))
     dump(baseline, checkpoint_dir / "c2_motif_hgb.joblib")
+    calibration_baseline_scores = baseline.predict_proba(calibration_x)[:, 1]
+    test_baseline_scores = baseline.predict_proba(test_x)[:, 1]
     systems["C2_motif_hgb"] = evaluate_score_rows(
-        baseline.predict_proba(calibration_x)[:, 1],
-        baseline.predict_proba(test_x)[:, 1],
+        calibration_baseline_scores,
+        test_baseline_scores,
         calibration,
         test,
         calibration_total,
@@ -538,6 +708,16 @@ def main() -> None:
         test_total,
         args.target_precision,
     )
+    systems["C2_motif_hgb_e1_correction"] = evaluate_detection_with_external_correction(
+        calibration_baseline_scores,
+        test_baseline_scores,
+        test_proposal_scores,
+        calibration,
+        test,
+        calibration_total,
+        test_total,
+        args.target_precision,
+    )
 
     fusion = make_small_leaf(args.seed + 1)
     fusion.fit(
@@ -548,6 +728,36 @@ def main() -> None:
     systems["E1_fusion_hgb"] = evaluate_score_rows(
         fusion.predict_proba(_fusion_features(calibration_x, calibration_logits, calibration_scores))[:, 1],
         fusion.predict_proba(_fusion_features(test_x, test_logits, test_scores))[:, 1],
+        calibration,
+        test,
+        calibration_total,
+        test_total,
+        args.target_precision,
+    )
+    proposal_selected = make_small_leaf(args.seed + 2)
+    proposal_selected.fit(
+        build_proposal_selected_features(train_x, raw_train_tensors.proposal, train_proposal_scores),
+        train["labels"].astype(np.int64),
+    )
+    dump(proposal_selected, checkpoint_dir / "e1_proposal_selected_hgb.joblib")
+    calibration_proposal_selected_scores = proposal_selected.predict_proba(
+        build_proposal_selected_features(
+            calibration_x,
+            raw_calibration_tensors.proposal,
+            calibration_proposal_scores,
+        )
+    )[:, 1]
+    test_proposal_selected_scores = proposal_selected.predict_proba(
+        build_proposal_selected_features(
+            test_x,
+            raw_test_tensors.proposal,
+            test_proposal_scores,
+        )
+    )[:, 1]
+    systems["E1_proposal_selected_hgb"] = evaluate_detection_with_external_correction(
+        calibration_proposal_selected_scores,
+        test_proposal_selected_scores,
+        test_proposal_scores,
         calibration,
         test,
         calibration_total,

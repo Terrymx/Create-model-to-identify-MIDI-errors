@@ -8,6 +8,8 @@ import torch
 from e1_edit_energy_verifier import (
     E1EditEnergyNet,
     build_e1_feature_tensors,
+    build_proposal_selected_features,
+    evaluate_detection_with_external_correction,
     proposal_target_indices,
 )
 
@@ -82,6 +84,60 @@ class E1EditEnergyVerifierTest(unittest.TestCase):
 
         self.assertEqual(tuple(candidate_logits.shape), (3,))
         self.assertEqual(tuple(proposal_logits.shape), (3, 4))
+
+    def test_build_proposal_selected_features_uses_e1_ranked_best_proposal(self) -> None:
+        candidate = np.asarray([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        proposal = np.asarray(
+            [
+                [[10.0, 11.0], [20.0, 21.0], [30.0, 31.0]],
+                [[40.0, 41.0], [50.0, 51.0], [60.0, 61.0]],
+            ],
+            dtype=np.float32,
+        )
+        proposal_logits = np.asarray(
+            [[0.1, 2.0, 0.5], [3.0, 2.0, 1.0]],
+            dtype=np.float32,
+        )
+
+        features = build_proposal_selected_features(candidate, proposal, proposal_logits)
+
+        np.testing.assert_array_equal(features[:, :2], candidate)
+        np.testing.assert_array_equal(features[0, 2:4], np.asarray([20.0, 21.0], dtype=np.float32))
+        np.testing.assert_array_equal(features[1, 2:4], np.asarray([40.0, 41.0], dtype=np.float32))
+        self.assertGreater(features[0, -2], 0.0)
+
+    def test_external_correction_keeps_detection_but_changes_correction_ranking(self) -> None:
+        calibration = {
+            "labels": np.asarray([1, 0, 1, 0], dtype=np.int64),
+        }
+        test = {
+            "labels": np.asarray([1, 0, 1], dtype=np.int64),
+            "proposals": np.asarray([[60, 64, 65], [60, 61, 62], [67, 68, 69]], dtype=np.int64),
+            "b_ranking": np.asarray([[0.9, 0.1, 0.0], [0.9, 0.1, 0.0], [0.9, 0.1, 0.0]], dtype=np.float32),
+            "error_kind": np.asarray([1, 1, 1], dtype=np.int64),
+            "target_pitch": np.asarray([64, 67, 69], dtype=np.int64),
+        }
+        calibration_scores = np.asarray([0.9, 0.1, 0.8, 0.2], dtype=np.float32)
+        test_scores = np.asarray([0.9, 0.1, 0.8], dtype=np.float32)
+        external_proposal_scores = np.asarray(
+            [[0.1, 0.9, 0.0], [0.1, 0.2, 0.3], [0.1, 0.0, 0.9]],
+            dtype=np.float32,
+        )
+
+        result = evaluate_detection_with_external_correction(
+            calibration_scores,
+            test_scores,
+            external_proposal_scores,
+            calibration,
+            test,
+            calibration_total_errors=2,
+            test_total_errors=2,
+            target_precision=0.80,
+        )
+
+        row = result["best_feasible_test"]["selected_test"]
+        self.assertEqual(row["tp"], 2)
+        self.assertEqual(row["correction"]["top1_accuracy"], 1.0)
 
 
 if __name__ == "__main__":
