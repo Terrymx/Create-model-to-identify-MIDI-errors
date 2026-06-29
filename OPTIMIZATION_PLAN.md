@@ -1,26 +1,175 @@
 # MIDI Error Correction Optimization Plan
 
-Last updated: 2026-06-20
+Last updated: 2026-06-28
 
 ## Objective
 
 Maximize wrong-note recall subject to precision `>= 0.80` on sparse-error MIDI.
-The current best result is `P=0.8008`, `R=0.5963`. The frozen candidate union
-has recall ceiling `0.7284`, so the immediate bottleneck is candidate ranking,
-especially replacement errors.
+The accepted current detection mainline is `C2_motif_hgb`, with `P=0.8004`,
+`R=0.6123`, and `F1=0.6938` under the unified piece-consistent protocol. The
+expanded candidate pool has recall ceiling about `0.8328`, so the immediate
+bottleneck is no longer candidate discovery. The active problem is separating
+true errors from locally plausible candidates that are already in the candidate
+pool.
+
+## 2026-06-28 Active Target: Proposal-Selector Trust Verifier
+
+Direction A result is now the main decision point. The proposal-selector gap
+analysis was run remotely and saved as:
+
+- `training_logs/proposal_selector_gap_analysis.md`
+- `training_logs/proposal_selector_gap_analysis.json`
+
+Key results:
+
+- total test errors: `15639`;
+- current `C2_motif_hgb` true positives: `9575`, recall `0.6123`;
+- candidate false negatives: `3326`;
+- candidate false negatives where the clean target is already in proposals:
+  `2199`;
+- ideal recall if only target-present candidate FNs were rescued: `0.7529`;
+- ideal recall if all candidate FNs were rescued: `0.8249`.
+
+For the `2199` target-present replacement FNs, existing proposal selectors rank
+the target as follows:
+
+| Selector | Top-1 | Top-2 | Top-3 | Mean rank |
+| --- | ---: | ---: | ---: | ---: |
+| B ranking | `0.5880` | `0.7808` | `0.9068` | `1.7244` |
+| C aligned ranking | `0.5880` | `0.7808` | `0.9218` | `1.7094` |
+| E1 proposal scores | `0.7904` | `0.9472` | `0.9914` | `1.2710` |
+
+Conclusion: the bottleneck for this FN region is not proposal discovery and is
+probably not proposal ranking either. E1 already ranks the correct pitch near
+the top for almost every target-present candidate FN. The active optimization
+should therefore be a proposal-selector trust verifier / candidate boost:
+
+1. keep the accepted `C2_motif_hgb` detector and the current candidate cache;
+2. focus only on replacement candidates whose proposal set has strong E1/B/C
+   agreement and musical compatibility;
+3. add candidate-level features that summarize proposal evidence, especially
+   E1 best score, E1 margin, B/C/E1 agreement, target-like pitch relation,
+   motif absence/weakness, and current C2 score;
+4. train/calibrate a small rescue verifier or score boost on calibration data;
+5. accept only if recall improves over `0.6123` while precision remains
+   `>=0.80`.
+
+This is intentionally not a new proposal generator. It answers: when a strong
+proposal already exists, why does `C2_motif_hgb` still reject the candidate?
+
+## 2026-06-28 Paused Direction: Clean-MIDI Patch Predictor
+
+The next optimization target is a real clean-MIDI patch predictor / masked
+denoising model. The previous E2 learned patch-energy experiment is rejected as
+a detection mainline because it trained directly on sparse candidate rows and
+did not improve recall. The replacement direction is to learn musical patch
+structure from clean MIDI first, then use the learned patch likelihood as new
+evidence for the existing verifier.
+
+Core hypothesis:
+
+```text
+If a candidate is a short, in-key, or locally plausible wrong note, local
+single-note and counterfactual evidence may be ambiguous. A patch model trained
+on clean MIDI can still prefer the B/E1 proposed edit over the observed patch
+when the observed note disrupts beat-level, onset-group, voice-contour, or
+phrase-local structure.
+```
+
+The first clean-only implementation completed as a negative result: the patch
+model learned center-pitch prediction, but its likelihood gain mostly acted as a
+conservative precision filter. It removed `404` false positives but also lost
+`310` true positives, reducing recall from `0.6123` to `0.6057`.
+
+The denoising/contrastive implementation was also negative: it reduced recall
+to `0.5947` at precision `0.8039`. The patch-predictor route is therefore
+paused unless a later error slice shows a narrower patch-specific use case.
+
+The attempted implementation kept the accepted detector and candidate cache,
+but changed the patch model's training target from clean-only prediction to
+candidate-denoising contrastive ranking:
+
+1. train a patch predictor on train-split candidate rows, using the clean target
+   pitch as the positive and the corrupted observed pitch as the negative when
+   they differ;
+2. at verifier time, build observed and proposal-edited patches around each
+   cached candidate;
+3. compute patch likelihood / reconstruction-energy features such as
+   `edited_energy - observed_energy`, best proposal energy, and proposal margin;
+4. append those features to `C2_motif_hgb` and evaluate under the same
+   calibration/test protocol;
+5. use E1-style proposal selection only as correction evidence, not as a
+   replacement detector.
+
+Original success gates:
+
+- minimal success: improve over `C2_motif_hgb` at matched seed/protocol;
+- target success: recall `> 0.6123` at precision `>= 0.80`;
+- strong success: recall `>= 0.63` at precision `>= 0.80`, with measurable
+  recovery of short-note or in-key false negatives.
+
+Rejected near-term directions:
+
+- more shallow HGB feature stacking without new information;
+- the current D global sequential selector;
+- the current supervised E2 candidate-row model;
+- FDR as the primary recall-improvement mechanism;
+- detector retraining before verifier evidence improves.
 
 ## Current Evidence
 
 - traditional end-to-end classifiers have high precision but very low recall;
-- theory interactions, pairwise ranking, score fusion, short/scale calibration,
-  and post-corruption register calibration do not beat the current frontier;
-- delete candidate recall is already above `0.91`;
-- replace candidate recall is about `0.68`;
-- false negatives are concentrated among short notes and scale tones;
-- manually partitioning these contexts produces only small score shifts and is
-  now considered auxiliary evidence rather than the main optimization route.
+- counterfactual B/C evidence improves candidate ranking and remains part of the
+  accepted verifier;
+- motif/repetition evidence is the latest accepted recall improvement and is
+  the current detection mainline;
+- E1 and shallow patch features improve correction ranking but do not replace
+  `C2_motif_hgb` for detection;
+- FDR/risk-control improves some high-precision operating points but reduces
+  recall at the active `P >= 0.80` target;
+- the current E2 patch-energy model failed because it learned from candidate
+  labels instead of learning normal clean-MIDI patch structure first.
 
 ## Updated Priority
+
+### Priority 1: Proposal-selector trust verifier
+
+Use E1/B/C proposal evidence to rescue target-present replacement FNs that the
+current detector rejects. The highest-value slice is `replacement +
+target-present + strong E1 rank + low C2 score`, especially where motif evidence
+is weak or absent.
+
+### Priority 2: Error-family specialization
+
+Split the rescue analysis by error family, especially short in-key
+replacements, out-of-key replacements, repeated-note/ornament contexts,
+register/voice-crossing cases, and deletion touches.
+
+### Priority 3: Clean or denoising patch evidence, only if narrowed
+
+The broad clean/denoising patch predictor is negative and should not remain the
+primary route. Revisit it only for a specific slice where proposal-selector
+evidence is insufficient.
+
+### Priority 4: Real AMT residual evaluation
+
+Before making strong deployment claims, transcribe a small MAESTRO audio subset,
+align predicted MIDI to reference MIDI, and compare real residual errors with
+the synthetic benchmark. This supports paper validity and future calibration,
+but it is not the fastest path to improving the current synthetic recall
+frontier.
+
+### Priority 5: Detector retraining or ensembling
+
+Only revisit detector retraining or larger ensembles after verifier evidence
+improves. The current candidate ceiling leaves enough room that better
+candidate ranking should be tested first.
+
+## Historical B+C Design
+
+The following sections preserve the older counterfactual B/C/D plan because it
+defines the accepted candidate cache, proposal, and verifier interfaces used by
+the new patch-predictor experiment.
 
 ### Priority 1: Counterfactual edit scoring
 

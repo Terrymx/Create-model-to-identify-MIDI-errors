@@ -1,0 +1,193 @@
+{
+  "threshold": 0.5750406384468079,
+  "oracle": {
+    "total_errors": 15639,
+    "current_tp": 9575,
+    "current_recall": 0.6122514227252381,
+    "candidate_fn_rows": 3326,
+    "candidate_fn_target_present": 2199,
+    "replace_fn_target_present": 2199,
+    "ideal_recall_rescue_target_present": 0.7528614361532068,
+    "ideal_recall_rescue_replace_target_present": 0.7528614361532068,
+    "ideal_recall_rescue_all_candidate_fn": 0.8249248673188823
+  },
+  "groups": [
+    {
+      "name": "candidate_fn",
+      "count": 3326,
+      "target_present_fraction": 0.6611545399879736,
+      "motif_matched_fraction": 0.3274203247143716,
+      "positive_motif_gain_fraction": 0.22158749248346363,
+      "mean_score": 0.25742952561353305,
+      "near_threshold_fraction": 0.07336139506915214,
+      "far_below_threshold_fraction": 0.7083583884546001
+    },
+    {
+      "name": "target_present_fn",
+      "count": 2199,
+      "target_present_fraction": 1.0,
+      "motif_matched_fraction": 0.3597089586175534,
+      "positive_motif_gain_fraction": 0.2405638926784902,
+      "mean_score": 0.27254461658494056,
+      "near_threshold_fraction": 0.0814006366530241,
+      "far_below_threshold_fraction": 0.6784902228285584
+    },
+    {
+      "name": "replace_target_present_fn",
+      "count": 2199,
+      "target_present_fraction": 1.0,
+      "motif_matched_fraction": 0.3597089586175534,
+      "positive_motif_gain_fraction": 0.2405638926784902,
+      "mean_score": 0.27254461658494056,
+      "near_threshold_fraction": 0.0814006366530241,
+      "far_below_threshold_fraction": 0.6784902228285584
+    }
+  ],
+  "selector_summaries": {
+    "all_candidate_positives": [
+      {
+        "name": "B_ranking",
+        "rows": 12901,
+        "target_present": 8574,
+        "top1": 0.44794977133555536,
+        "top2": 0.551352608324936,
+        "top3": 0.6187117277730408,
+        "mean_rank_when_present": 1.5654304027557373
+      },
+      {
+        "name": "C_aligned_ranking",
+        "rows": 12901,
+        "target_present": 8574,
+        "top1": 0.44794977133555536,
+        "top2": 0.551352608324936,
+        "top3": 0.6354546159212464,
+        "mean_rank_when_present": 1.5402379035949707
+      },
+      {
+        "name": "E1_proposal_scores",
+        "rows": 12901,
+        "target_present": 8574,
+        "top1": 0.5567785442988915,
+        "top2": 0.6371599100844896,
+        "top3": 0.6599488411751027,
+        "mean_rank_when_present": 1.2105201482772827
+      }
+    ],
+    "true_positives": [
+      {
+        "name": "B_ranking",
+        "rows": 9575,
+        "target_present": 6375,
+        "top1": 0.4685117493472585,
+        "top2": 0.5635509138381201,
+        "top3": 0.625378590078329,
+        "mean_rank_when_present": 1.51058828830719
+      },
+      {
+        "name": "C_aligned_ranking",
+        "rows": 9575,
+        "target_present": 6375,
+        "top1": 0.4685117493472585,
+        "top2": 0.5635509138381201,
+        "top3": 0.644490861618799,
+        "mean_rank_when_present": 1.4818823337554932
+      },
+      {
+        "name": "E1_proposal_scores",
+        "rows": 9575,
+        "target_present": 6375,
+        "top1": 0.568668407310705,
+        "top2": 0.6409399477806789,
+        "top3": 0.6615143603133159,
+        "mean_rank_when_present": 1.1896470785140991
+      }
+    ],
+    "candidate_fn": [
+      {
+        "name": "B_ranking",
+        "rows": 3326,
+        "target_present": 2199,
+        "top1": 0.388755261575466,
+        "top2": 0.5162357185808779,
+        "top3": 0.5995189416716777,
+        "mean_rank_when_present": 1.724420189857483
+      },
+      {
+        "name": "C_aligned_ranking",
+        "rows": 3326,
+        "target_present": 2199,
+        "top1": 0.388755261575466,
+        "top2": 0.5162357185808779,
+        "top3": 0.6094407696933253,
+        "mean_rank_when_present": 1.7094134092330933
+      },
+      {
+        "name": "E1_proposal_scores",
+        "rows": 3326,
+        "target_present": 2199,
+        "top1": 0.5225496091401083,
+        "top2": 0.6262778111846061,
+        "top3": 0.6554419723391461,
+        "mean_rank_when_present": 1.2710323333740234
+      }
+    ],
+    "candidate_fn_target_present": [
+      {
+        "name": "B_ranking",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.5879945429740792,
+        "top2": 0.7808094588449295,
+        "top3": 0.9067758071850841,
+        "mean_rank_when_present": 1.724420189857483
+      },
+      {
+        "name": "C_aligned_ranking",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.5879945429740792,
+        "top2": 0.7808094588449295,
+        "top3": 0.9217826284674853,
+        "mean_rank_when_present": 1.7094134092330933
+      },
+      {
+        "name": "E1_proposal_scores",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.7903592542064575,
+        "top2": 0.9472487494315598,
+        "top3": 0.9913597089586176,
+        "mean_rank_when_present": 1.2710323333740234
+      }
+    ],
+    "replace_fn_target_present": [
+      {
+        "name": "B_ranking",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.5879945429740792,
+        "top2": 0.7808094588449295,
+        "top3": 0.9067758071850841,
+        "mean_rank_when_present": 1.724420189857483
+      },
+      {
+        "name": "C_aligned_ranking",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.5879945429740792,
+        "top2": 0.7808094588449295,
+        "top3": 0.9217826284674853,
+        "mean_rank_when_present": 1.7094134092330933
+      },
+      {
+        "name": "E1_proposal_scores",
+        "rows": 2199,
+        "target_present": 2199,
+        "top1": 0.7903592542064575,
+        "top2": 0.9472487494315598,
+        "top3": 0.9913597089586176,
+        "mean_rank_when_present": 1.2710323333740234
+      }
+    ]
+  }
+}

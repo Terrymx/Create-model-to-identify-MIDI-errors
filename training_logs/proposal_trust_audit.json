@@ -1,0 +1,497 @@
+{
+  "thresholds": {
+    "baseline": 0.5750406384468079,
+    "narrow_trust_baseline": 0.5825266242027283,
+    "narrow_trust_rescue": 0.9539569616317749,
+    "narrow_full_baseline": 0.5825266242027283,
+    "narrow_full_rescue": 0.7967907786369324
+  },
+  "system_delta": [
+    {
+      "system": "C2_motif_hgb",
+      "precision": 0.8003845189333779,
+      "recall": 0.6122514227252381,
+      "tp_delta": 0,
+      "fp_delta": 0,
+      "rescued_rows": 0
+    },
+    {
+      "system": "proposal_trust_hgb",
+      "precision": 0.8089819843116973,
+      "recall": 0.6001023083317347,
+      "tp_delta": -190,
+      "fp_delta": -172,
+      "rescued_rows": 0
+    },
+    {
+      "system": "C2_motif_proposal_trust_rescue",
+      "precision": 0.8013922670468842,
+      "recall": 0.6109725685785536,
+      "tp_delta": -20,
+      "fp_delta": -20,
+      "rescued_rows": 41
+    },
+    {
+      "system": "C2_motif_narrow_trust_rescue",
+      "precision": 0.8024556387183585,
+      "recall": 0.6101413133832086,
+      "tp_delta": -33,
+      "fp_delta": -39,
+      "rescued_rows": 9
+    },
+    {
+      "system": "C2_motif_proposal_trust_hgb",
+      "precision": 0.8055171221030785,
+      "recall": 0.5956263188183387,
+      "tp_delta": -260,
+      "fp_delta": -139,
+      "rescued_rows": 0
+    },
+    {
+      "system": "C2_motif_full_trust_rescue",
+      "precision": 0.811991694064717,
+      "recall": 0.6001023083317347,
+      "tp_delta": -190,
+      "fp_delta": -215,
+      "rescued_rows": 13
+    },
+    {
+      "system": "C2_motif_narrow_full_rescue",
+      "precision": 0.8021867115222876,
+      "recall": 0.6098855425538717,
+      "tp_delta": -37,
+      "fp_delta": -36,
+      "rescued_rows": 8
+    }
+  ],
+  "groups": [
+    {
+      "name": "baseline_candidate_fn",
+      "count": 3326,
+      "positives": 3326,
+      "negatives": 0,
+      "positive_rate": 1.0,
+      "target_present_fraction": 0.661154568195343,
+      "mean_baseline_score": 0.2574295103549957,
+      "mean_rescue_score": 0.13323374092578888,
+      "target_rank": {
+        "rows": 3326,
+        "target_present": 2199,
+        "top1": 0.7903592586517334,
+        "top2": 0.9472487568855286,
+        "top3": 0.9913597106933594,
+        "mean_rank_when_present": 1.2710323333740234
+      }
+    },
+    {
+      "name": "baseline_false_positive",
+      "count": 2388,
+      "positives": 0,
+      "negatives": 2388,
+      "positive_rate": 0.0,
+      "target_present_fraction": 0.0,
+      "mean_baseline_score": 0.7752123475074768,
+      "mean_rescue_score": 0.943851113319397,
+      "target_rank": {
+        "rows": 2388,
+        "target_present": 0,
+        "top1": 0.0,
+        "top2": 0.0,
+        "top3": 0.0,
+        "mean_rank_when_present": 0.0
+      }
+    },
+    {
+      "name": "narrow_trust_eligible",
+      "count": 4338,
+      "positives": 705,
+      "negatives": 3633,
+      "positive_rate": 0.16251729428768158,
+      "target_present_fraction": 0.12724758684635162,
+      "mean_baseline_score": 0.18069319427013397,
+      "mean_rescue_score": 0.07584160566329956,
+      "target_rank": {
+        "rows": 4338,
+        "target_present": 552,
+        "top1": 0.9692028760910034,
+        "top2": 0.9909420013427734,
+        "top3": 0.9981883764266968,
+        "mean_rank_when_present": 1.0416666269302368
+      }
+    },
+    {
+      "name": "narrow_trust_eligible_tp",
+      "count": 705,
+      "positives": 705,
+      "negatives": 0,
+      "positive_rate": 1.0,
+      "target_present_fraction": 0.7829787135124207,
+      "mean_baseline_score": 0.29275766015052795,
+      "mean_rescue_score": 0.16562192142009735,
+      "target_rank": {
+        "rows": 705,
+        "target_present": 552,
+        "top1": 0.9692028760910034,
+        "top2": 0.9909420013427734,
+        "top3": 0.9981883764266968,
+        "mean_rank_when_present": 1.0416666269302368
+      }
+    },
+    {
+      "name": "narrow_trust_eligible_fp",
+      "count": 3633,
+      "positives": 0,
+      "negatives": 3633,
+      "positive_rate": 0.0,
+      "target_present_fraction": 0.0,
+      "mean_baseline_score": 0.15894657373428345,
+      "mean_rescue_score": 0.05841933190822601,
+      "target_rank": {
+        "rows": 3633,
+        "target_present": 0,
+        "top1": 0.0,
+        "top2": 0.0,
+        "top3": 0.0,
+        "mean_rank_when_present": 0.0
+      }
+    },
+    {
+      "name": "narrow_trust_rescued",
+      "count": 9,
+      "positives": 6,
+      "negatives": 3,
+      "positive_rate": 0.6666666865348816,
+      "target_present_fraction": 0.2222222238779068,
+      "mean_baseline_score": 0.5562357306480408,
+      "mean_rescue_score": 0.9617430567741394,
+      "target_rank": {
+        "rows": 9,
+        "target_present": 2,
+        "top1": 1.0,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0
+      }
+    },
+    {
+      "name": "narrow_full_eligible",
+      "count": 5151,
+      "positives": 657,
+      "negatives": 4494,
+      "positive_rate": 0.12754805386066437,
+      "target_present_fraction": 0.09376820176839828,
+      "mean_baseline_score": 0.1287975013256073,
+      "mean_rescue_score": 0.022652333602309227,
+      "target_rank": {
+        "rows": 5151,
+        "target_present": 483,
+        "top1": 0.9213250279426575,
+        "top2": 0.9730848670005798,
+        "top3": 0.9958592057228088,
+        "mean_rank_when_present": 1.109730839729309
+      }
+    },
+    {
+      "name": "narrow_full_rescued",
+      "count": 8,
+      "positives": 2,
+      "negatives": 6,
+      "positive_rate": 0.25,
+      "target_present_fraction": 0.0,
+      "mean_baseline_score": 0.34873148798942566,
+      "mean_rescue_score": 0.8752503395080566,
+      "target_rank": {
+        "rows": 8,
+        "target_present": 0,
+        "top1": 0.0,
+        "top2": 0.0,
+        "top3": 0.0,
+        "mean_rank_when_present": 0.0
+      }
+    }
+  ],
+  "topk": [
+    {
+      "name": "narrow_trust_eligible_rejected_top25",
+      "count": 25,
+      "positives": 13,
+      "negatives": 12,
+      "positive_rate": 0.5199999809265137,
+      "target_present_fraction": 0.20000000298023224,
+      "mean_baseline_score": 0.5496436953544617,
+      "mean_rescue_score": 0.9468156695365906,
+      "target_rank": {
+        "rows": 25,
+        "target_present": 5,
+        "top1": 1.0,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0
+      },
+      "k": 25
+    },
+    {
+      "name": "narrow_trust_eligible_rejected_top50",
+      "count": 50,
+      "positives": 23,
+      "negatives": 27,
+      "positive_rate": 0.46000000834465027,
+      "target_present_fraction": 0.23999999463558197,
+      "mean_baseline_score": 0.5455197691917419,
+      "mean_rescue_score": 0.9122595191001892,
+      "target_rank": {
+        "rows": 50,
+        "target_present": 12,
+        "top1": 1.0,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0
+      },
+      "k": 50
+    },
+    {
+      "name": "narrow_trust_eligible_rejected_top100",
+      "count": 100,
+      "positives": 40,
+      "negatives": 60,
+      "positive_rate": 0.4000000059604645,
+      "target_present_fraction": 0.23999999463558197,
+      "mean_baseline_score": 0.5384076833724976,
+      "mean_rescue_score": 0.8398579955101013,
+      "target_rank": {
+        "rows": 100,
+        "target_present": 24,
+        "top1": 1.0,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0
+      },
+      "k": 100
+    },
+    {
+      "name": "narrow_trust_eligible_rejected_top200",
+      "count": 200,
+      "positives": 74,
+      "negatives": 126,
+      "positive_rate": 0.3700000047683716,
+      "target_present_fraction": 0.25999999046325684,
+      "mean_baseline_score": 0.5186591148376465,
+      "mean_rescue_score": 0.7084685564041138,
+      "target_rank": {
+        "rows": 200,
+        "target_present": 52,
+        "top1": 1.0,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0
+      },
+      "k": 200
+    },
+    {
+      "name": "narrow_trust_eligible_rejected_top500",
+      "count": 500,
+      "positives": 179,
+      "negatives": 321,
+      "positive_rate": 0.3580000102519989,
+      "target_present_fraction": 0.2680000066757202,
+      "mean_baseline_score": 0.47025513648986816,
+      "mean_rescue_score": 0.45342516899108887,
+      "target_rank": {
+        "rows": 500,
+        "target_present": 134,
+        "top1": 0.9850746393203735,
+        "top2": 0.9925373196601868,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0223881006240845
+      },
+      "k": 500
+    },
+    {
+      "name": "narrow_full_eligible_rejected_top25",
+      "count": 25,
+      "positives": 9,
+      "negatives": 16,
+      "positive_rate": 0.36000001430511475,
+      "target_present_fraction": 0.23999999463558197,
+      "mean_baseline_score": 0.34075435996055603,
+      "mean_rescue_score": 0.7634543776512146,
+      "target_rank": {
+        "rows": 25,
+        "target_present": 6,
+        "top1": 0.8333333134651184,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.1666666269302368
+      },
+      "k": 25
+    },
+    {
+      "name": "narrow_full_eligible_rejected_top50",
+      "count": 50,
+      "positives": 23,
+      "negatives": 27,
+      "positive_rate": 0.46000000834465027,
+      "target_present_fraction": 0.30000001192092896,
+      "mean_baseline_score": 0.34289199113845825,
+      "mean_rescue_score": 0.6628104448318481,
+      "target_rank": {
+        "rows": 50,
+        "target_present": 15,
+        "top1": 0.800000011920929,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.2000000476837158
+      },
+      "k": 50
+    },
+    {
+      "name": "narrow_full_eligible_rejected_top100",
+      "count": 100,
+      "positives": 43,
+      "negatives": 57,
+      "positive_rate": 0.4300000071525574,
+      "target_present_fraction": 0.3100000023841858,
+      "mean_baseline_score": 0.33360424637794495,
+      "mean_rescue_score": 0.5351289510726929,
+      "target_rank": {
+        "rows": 100,
+        "target_present": 31,
+        "top1": 0.8709677457809448,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.1290322542190552
+      },
+      "k": 100
+    },
+    {
+      "name": "narrow_full_eligible_rejected_top200",
+      "count": 200,
+      "positives": 67,
+      "negatives": 133,
+      "positive_rate": 0.33500000834465027,
+      "target_present_fraction": 0.25,
+      "mean_baseline_score": 0.3227991461753845,
+      "mean_rescue_score": 0.3783011734485626,
+      "target_rank": {
+        "rows": 200,
+        "target_present": 50,
+        "top1": 0.8999999761581421,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.100000023841858
+      },
+      "k": 200
+    },
+    {
+      "name": "narrow_full_eligible_rejected_top500",
+      "count": 500,
+      "positives": 133,
+      "negatives": 367,
+      "positive_rate": 0.26600000262260437,
+      "target_present_fraction": 0.19200000166893005,
+      "mean_baseline_score": 0.29966241121292114,
+      "mean_rescue_score": 0.191961407661438,
+      "target_rank": {
+        "rows": 500,
+        "target_present": 96,
+        "top1": 0.9270833134651184,
+        "top2": 1.0,
+        "top3": 1.0,
+        "mean_rank_when_present": 1.0729166269302368
+      },
+      "k": 500
+    }
+  ],
+  "feature_deltas": [
+    {
+      "feature": "e1_best",
+      "positive_mean": 1.9425723552703857,
+      "negative_mean": 1.2619690895080566,
+      "delta": 0.6806032657623291
+    },
+    {
+      "feature": "e1_margin",
+      "positive_mean": 4.976692199707031,
+      "negative_mean": 4.708259582519531,
+      "delta": 0.2684326171875
+    },
+    {
+      "feature": "b_at_e1_best",
+      "positive_mean": 2.9224021434783936,
+      "negative_mean": 2.688936233520508,
+      "delta": 0.23346590995788574
+    },
+    {
+      "feature": "c_at_e1_best",
+      "positive_mean": 2.9224021434783936,
+      "negative_mean": 2.688936233520508,
+      "delta": 0.23346590995788574
+    },
+    {
+      "feature": "c2_score",
+      "positive_mean": 0.29275766015052795,
+      "negative_mean": 0.15894657373428345,
+      "delta": 0.1338110864162445
+    },
+    {
+      "feature": "e1_entropy",
+      "positive_mean": 0.1636275053024292,
+      "negative_mean": 0.17770546674728394,
+      "delta": -0.014077961444854736
+    },
+    {
+      "feature": "best_pitch",
+      "positive_mean": 0.5060591101646423,
+      "negative_mean": 0.512617290019989,
+      "delta": -0.00655817985534668
+    },
+    {
+      "feature": "observed_pitch",
+      "positive_mean": 0.5062265992164612,
+      "negative_mean": 0.5126194357872009,
+      "delta": -0.006392836570739746
+    },
+    {
+      "feature": "e1_best_prob",
+      "positive_mean": 0.9597862362861633,
+      "negative_mean": 0.9558120965957642,
+      "delta": 0.00397413969039917
+    },
+    {
+      "feature": "e1_c_agree",
+      "positive_mean": 0.9929078221321106,
+      "negative_mean": 0.9895403385162354,
+      "delta": 0.003367483615875244
+    },
+    {
+      "feature": "b_c_agree",
+      "positive_mean": 0.9929078221321106,
+      "negative_mean": 0.9895403385162354,
+      "delta": 0.003367483615875244
+    },
+    {
+      "feature": "best_delta",
+      "positive_mean": -0.0008865245035849512,
+      "negative_mean": -1.1468767297628801e-05,
+      "delta": -0.0008750557362873224
+    },
+    {
+      "feature": "best_abs_delta",
+      "positive_mean": 0.13150116801261902,
+      "negative_mean": 0.1309179812669754,
+      "delta": 0.0005831867456436157
+    },
+    {
+      "feature": "e1_b_agree",
+      "positive_mean": 1.0,
+      "negative_mean": 1.0,
+      "delta": 0.0
+    },
+    {
+      "feature": "valid_proposals",
+      "positive_mean": 4.0,
+      "negative_mean": 4.0,
+      "delta": 0.0
+    }
+  ]
+}
